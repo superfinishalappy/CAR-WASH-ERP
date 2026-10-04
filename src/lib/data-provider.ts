@@ -272,9 +272,6 @@ export class DataProvider {
       }
 
       const userId = authData.user.id;
-      let profile: Profile | null = null;
-      let company: Company | null = null;
-
       // 2. Fetch authenticated user's profile
       const { data: pData, error: profileErr } = await supabase
         .from('profiles')
@@ -288,7 +285,8 @@ export class DataProvider {
           error: 'User profile not found in database.',
         };
       }
-      profile = pData;
+      const profile = pData as Profile;
+      let company: Company | null = null;
 
       if (!profile.active) {
         return { success: false, error: 'Account is deactivated. Contact administrator.' };
@@ -322,7 +320,7 @@ export class DataProvider {
         }
       }
 
-      this.currentSession = {
+      const session: UserSession = {
         user: {
           id: profile.id,
           email: syntheticEmail,
@@ -335,12 +333,13 @@ export class DataProvider {
         actingCompany: null,
       };
 
+      this.currentSession = session;
       saveCachedSession(this.currentSession);
 
       // Load all tenant data from Supabase
       await this.syncFromSupabase();
 
-      return { success: true, session: this.currentSession };
+      return { success: true, session };
     } catch (err: any) {
       return { success: false, error: err.message || 'Login failed.' };
     }
