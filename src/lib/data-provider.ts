@@ -131,8 +131,8 @@ export class DataProvider {
         this.customers = custData;
       }
 
-      // 5. Jobs
-      let jobQuery = supabase.from('jobs').select('*').order('created_at', { ascending: false });
+      // 5. Jobs (Safeguarded to most recent 2,500 jobs for instant operational cache)
+      let jobQuery = supabase.from('jobs').select('*').order('created_at', { ascending: false }).limit(2500);
       if (!isPlatform && cid) {
         jobQuery = jobQuery.eq('company_id', cid);
       }
@@ -141,8 +141,8 @@ export class DataProvider {
         this.jobs = jobData;
       }
 
-      // 6. Expenses
-      let expQuery = supabase.from('expenses').select('*').order('created_at', { ascending: false });
+      // 6. Expenses (Safeguarded to most recent 1,500 records)
+      let expQuery = supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(1500);
       if (!isPlatform && cid) {
         expQuery = expQuery.eq('company_id', cid);
       }
@@ -152,7 +152,7 @@ export class DataProvider {
       }
 
       // 7. Advances
-      let advQuery = supabase.from('advances').select('*').order('created_at', { ascending: false });
+      let advQuery = supabase.from('advances').select('*').order('created_at', { ascending: false }).limit(1000);
       if (!isPlatform && cid) {
         advQuery = advQuery.eq('company_id', cid);
       }
@@ -161,8 +161,8 @@ export class DataProvider {
         this.advances = advData;
       }
 
-      // 8. Attendance
-      let attQuery = supabase.from('attendance').select('*').order('created_at', { ascending: false });
+      // 8. Attendance (Safeguarded to most recent 1,500 records)
+      let attQuery = supabase.from('attendance').select('*').order('created_at', { ascending: false }).limit(1500);
       if (!isPlatform && cid) {
         attQuery = attQuery.eq('company_id', cid);
       }
@@ -171,8 +171,8 @@ export class DataProvider {
         this.attendance = attData;
       }
 
-      // 9. Customer Payments
-      let payQuery = supabase.from('customer_payments').select('*').order('created_at', { ascending: false });
+      // 9. Customer Payments (Safeguarded to most recent 1,500 records)
+      let payQuery = supabase.from('customer_payments').select('*').order('created_at', { ascending: false }).limit(1500);
       if (!isPlatform && cid) {
         payQuery = payQuery.eq('company_id', cid);
       }
@@ -257,62 +257,38 @@ export class DataProvider {
     try {
       const isPlatformLogin = codeUpper === 'ADMIN';
 
-      // 1. Attempt Supabase Auth login
+      // 1. Authenticate with Supabase Auth (strict cryptographic password verification)
       const syntheticEmail = buildSyntheticEmail(userClean, codeUpper);
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: syntheticEmail,
         password,
       });
 
-      let userId = authData?.user?.id;
+      if (authError || !authData?.user?.id) {
+        return {
+          success: false,
+          error: authError?.message || 'Invalid username or password.',
+        };
+      }
+
+      const userId = authData.user.id;
       let profile: Profile | null = null;
       let company: Company | null = null;
 
-      if (userId) {
-        // Authenticated with Supabase Auth: Fetch profile
-        const { data: pData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-        profile = pData;
-      } else {
-        // Fallback: Direct lookup in Supabase profiles & companies tables
-        if (!isPlatformLogin) {
-          const { data: comp } = await supabase
-            .from('companies')
-            .select('*')
-            .eq('code', codeUpper)
-            .single();
-          if (comp) {
-            company = comp;
-            const { data: pData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('company_id', comp.id)
-              .ilike('username', userClean)
-              .single();
-            profile = pData;
-          } else {
-            return { success: false, error: 'Company ID not found in Supabase.' };
-          }
-        } else {
-          const { data: pData } = await supabase
-            .from('profiles')
-            .select('*')
-            .is('company_id', null)
-            .ilike('username', userClean)
-            .single();
-          profile = pData;
-        }
-      }
+      // 2. Fetch authenticated user's profile
+      const { data: pData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-      if (!profile) {
+      if (profileErr || !pData) {
         return {
           success: false,
-          error: authError?.message || 'Invalid username or password in Supabase database.',
+          error: 'User profile not found in database.',
         };
       }
+      profile = pData;
 
       if (!profile.active) {
         return { success: false, error: 'Account is deactivated. Contact administrator.' };
@@ -937,36 +913,74 @@ export class DataProvider {
     return { success: true };
   }
 
-  public getCustomerStatement(customerId: string): {
+  public getCustomerStatement(
+    customerId: string,
+    startDate?: string,
+    endDate?: string
+  ): {
     customer: Customer;
+    startDate?: string;
+    endDate?: string;
+    opening_balance: number;
+    total_billed: number;
+    total_paid: number;
+    pending_amount: number;
+    closing_balance: number;
     items: Array<{
+      id: string;
+      type: 'service' | 'payment';
       date: string;
+      ref_no: string;
       description: string;
+      vehicle_plate?: string;
+      vehicle_type?: string;
+      work_type?: string;
       debit: number;
       credit: number;
       balance: number;
+      is_paid?: boolean;
+      payment_note?: string;
     }>;
   } | null {
     const cust = this.customers.find((c) => c.id === customerId);
     if (!cust) return null;
 
-    const jobs = this.jobs.filter((j) => j.customer_id === customerId).map((j) => {
+    const allCustJobs = this.jobs.filter((j) => j.customer_id === customerId);
+    const allCustPayments = this.customerPayments.filter((p) => p.customer_id === customerId);
+
+    const jobs = allCustJobs.map((j) => {
       const isPaid = Boolean(j.is_paid);
       return {
+        id: j.id,
+        type: 'service' as const,
         date: j.entry_date,
         createdAt: j.created_at || j.entry_date,
-        description: `${j.work_type} - ${j.vehicle_type} (${j.plate || 'No plate'})${isPaid ? ' [✓ PAID AT COUNTER]' : ' [UNPAID / ON CREDIT]'}`,
+        ref_no: `INV-${j.entry_date.replace(/-/g, '')}-${j.id.slice(0, 5).toUpperCase()}`,
+        description: `${j.work_type} (${j.plate || 'No plate'})${isPaid ? ' [✓ Paid at Counter]' : ' [Unpaid Credit]'}`,
+        vehicle_plate: j.plate || undefined,
+        vehicle_type: j.vehicle_type,
+        work_type: j.work_type,
         debit: j.total,
-        credit: isPaid ? j.total : 0, // When paid directly at counter, credit cancels debit so net balance impact is 0
+        credit: isPaid ? j.total : 0,
+        is_paid: isPaid,
+        payment_note: undefined as string | undefined,
       };
     });
 
-    const payments = this.customerPayments.filter((p) => p.customer_id === customerId).map((p) => ({
+    const payments = allCustPayments.map((p) => ({
+      id: p.id,
+      type: 'payment' as const,
       date: p.entry_date,
       createdAt: p.created_at || p.entry_date,
-      description: `Payment received: ${p.note || 'Cash/Transfer'}`,
+      ref_no: `PAY-${p.entry_date.replace(/-/g, '')}-${p.id.slice(0, 5).toUpperCase()}`,
+      description: `Payment received: ${p.note || 'Cash/Card Transfer'}`,
+      vehicle_plate: undefined,
+      vehicle_type: undefined,
+      work_type: undefined,
       debit: 0,
       credit: p.amount,
+      is_paid: true,
+      payment_note: p.note || undefined,
     }));
 
     const combined = [...jobs, ...payments].sort((a, b) => {
@@ -975,23 +989,65 @@ export class DataProvider {
       return a.createdAt.localeCompare(b.createdAt);
     });
 
-    let running = 0;
-    const items = combined.map((item) => {
+    // Opening balance calculation (all transactions before startDate)
+    let opening_balance = 0;
+    const priorItems = startDate ? combined.filter((i) => i.date < startDate) : [];
+    for (const item of priorItems) {
+      opening_balance += item.debit - item.credit;
+    }
+    opening_balance = Math.round(opening_balance * 100) / 100;
+
+    // Filter items within date range
+    const inRangeItems = combined.filter((i) => {
+      if (startDate && i.date < startDate) return false;
+      if (endDate && i.date > endDate) return false;
+      return true;
+    });
+
+    let running = opening_balance;
+    let total_billed = 0;
+    let total_paid = 0;
+
+    const items = inRangeItems.map((item) => {
       running += item.debit - item.credit;
+      total_billed += item.debit;
+      total_paid += item.credit;
       return {
+        id: item.id,
+        type: item.type,
         date: item.date,
+        ref_no: item.ref_no,
         description: item.description,
+        vehicle_plate: item.vehicle_plate,
+        vehicle_type: item.vehicle_type,
+        work_type: item.work_type,
         debit: item.debit,
         credit: item.credit,
         balance: Math.round(running * 100) / 100,
+        is_paid: item.is_paid,
+        payment_note: item.payment_note,
       };
     });
+
+    // Total lifetime running balance for customer
+    let lifetimeBalance = 0;
+    for (const item of combined) {
+      lifetimeBalance += item.debit - item.credit;
+    }
+    const closing_balance = Math.round(running * 100) / 100;
 
     return {
       customer: {
         ...cust,
-        current_balance: Math.round(running * 100) / 100,
+        current_balance: Math.round(lifetimeBalance * 100) / 100,
       },
+      startDate,
+      endDate,
+      opening_balance,
+      total_billed: Math.round(total_billed * 100) / 100,
+      total_paid: Math.round(total_paid * 100) / 100,
+      pending_amount: Math.round(Math.max(0, closing_balance) * 100) / 100,
+      closing_balance,
       items,
     };
   }
