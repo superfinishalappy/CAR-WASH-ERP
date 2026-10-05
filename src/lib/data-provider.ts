@@ -1523,14 +1523,112 @@ export class DataProvider {
         return {
           ...a,
           staff_name: staff?.full_name || 'Staff',
+          daily_rate: a.daily_rate !== undefined ? a.daily_rate : (staff?.pay_type === 'daily' ? staff.pay_rate : undefined),
         };
       });
+  }
+
+  public getAttendanceRange(
+    startDate: string,
+    endDate: string,
+    staffId?: string,
+    companyId?: string
+  ): Attendance[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+
+    return this.attendance
+      .filter((a) => {
+        if (a.company_id !== cid) return false;
+        if (a.entry_date < startDate || a.entry_date > endDate) return false;
+        if (staffId && staffId !== 'all' && a.staff_id !== staffId) return false;
+        return true;
+      })
+      .map((a) => {
+        const staff = this.profiles.find((p) => p.id === a.staff_id);
+        return {
+          ...a,
+          staff_name: staff?.full_name || 'Staff',
+          daily_rate: a.daily_rate !== undefined ? a.daily_rate : (staff?.pay_type === 'daily' ? staff.pay_rate : undefined),
+        };
+      })
+      .sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+  }
+
+  public getStaffAttendanceSummary(
+    startDate: string,
+    endDate: string,
+    staffId?: string,
+    companyId?: string
+  ): Array<{
+    staff_id: string;
+    full_name: string;
+    username: string;
+    role: string;
+    pay_type: string;
+    pay_rate: number;
+    totalDays: number;
+    presentDays: number;
+    leaveDays: number;
+    unmarkedDays: number;
+    attendanceRate: number;
+    totalDailyWage: number;
+    records: Attendance[];
+  }> {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+
+    const activeStaff = this.profiles
+      .filter((p) => p.company_id === cid && p.active)
+      .filter((p) => !staffId || staffId === 'all' || p.id === staffId);
+
+    const d1 = new Date(startDate);
+    const d2 = new Date(endDate);
+    const diffTime = Math.max(0, d2.getTime() - d1.getTime());
+    const totalDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    return activeStaff.map((staff) => {
+      const records = this.attendance.filter(
+        (a) => a.company_id === cid && a.staff_id === staff.id && a.entry_date >= startDate && a.entry_date <= endDate
+      );
+
+      const presentRecords = records.filter((r) => r.status === 'present');
+      const presentDays = presentRecords.length;
+      const leaveDays = records.filter((r) => r.status === 'leave').length;
+      const unmarkedDays = Math.max(0, totalDays - presentDays - leaveDays);
+      const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+
+      let totalDailyWage = 0;
+      if (staff.pay_type === 'daily') {
+        totalDailyWage = presentRecords.reduce((sum, r) => {
+          const rate = r.daily_rate !== undefined ? r.daily_rate : staff.pay_rate;
+          return sum + rate;
+        }, 0);
+      }
+
+      return {
+        staff_id: staff.id,
+        full_name: staff.full_name,
+        username: staff.username,
+        role: staff.role,
+        pay_type: staff.pay_type,
+        pay_rate: staff.pay_rate,
+        totalDays,
+        presentDays,
+        leaveDays,
+        unmarkedDays,
+        attendanceRate,
+        totalDailyWage,
+        records: records.sort((a, b) => b.entry_date.localeCompare(a.entry_date)),
+      };
+    });
   }
 
   public markAttendance(
     staffId: string,
     date: string,
     status: 'present' | 'leave',
+    dailyRate?: number,
     companyId?: string
   ): { success: boolean; attendance?: Attendance; error?: string } {
     const cid = companyId || this.getEffectiveCompanyId();
@@ -1540,10 +1638,16 @@ export class DataProvider {
       return { success: false, error: 'Attendance for past days can only be recorded by the Owner.' };
     }
 
+    const staff = this.profiles.find((p) => p.id === staffId);
+    const resolvedRate = dailyRate !== undefined ? dailyRate : (staff?.pay_type === 'daily' ? staff.pay_rate : undefined);
+
     const existingIdx = this.attendance.findIndex((a) => a.staff_id === staffId && a.entry_date === date);
     if (existingIdx !== -1) {
       const old = { ...this.attendance[existingIdx] };
       this.attendance[existingIdx].status = status;
+      if (resolvedRate !== undefined) {
+        this.attendance[existingIdx].daily_rate = resolvedRate;
+      }
       this.logAudit('attendance', this.attendance[existingIdx].id, 'UPDATE', old, this.attendance[existingIdx]);
 
       if (supabase) {
@@ -1559,6 +1663,7 @@ export class DataProvider {
       entry_date: date,
       staff_id: staffId,
       status,
+      daily_rate: resolvedRate,
       created_at: new Date().toISOString(),
     };
     this.attendance.push(att);
@@ -1591,7 +1696,7 @@ export class DataProvider {
     let count = 0;
 
     for (const staff of staffList) {
-      this.markAttendance(staff.id, date, 'present', cid);
+      this.markAttendance(staff.id, date, 'present', undefined, cid);
       count++;
     }
 
@@ -1771,8 +1876,12 @@ export class DataProvider {
         const priceSum = sJobs.reduce((sum, j) => sum + j.price, 0);
         grossSalary = priceSum * (staff.pay_rate / 100);
       } else if (staff.pay_type === 'daily') {
-        // Daily: rate * present days
-        grossSalary = staff.pay_rate * presentDays;
+        // Daily: sum of each present day's actual recorded rate (or fallback to staff.pay_rate)
+        const presentRecords = sAtt.filter((t) => t.status === 'present');
+        grossSalary = presentRecords.reduce((sum, r) => {
+          const rate = r.daily_rate !== undefined ? r.daily_rate : staff.pay_rate;
+          return sum + rate;
+        }, 0);
       } else if (staff.pay_type === 'monthly') {
         // Monthly: (rate / 30) * periodDays
         grossSalary = (staff.pay_rate / 30) * periodDays;

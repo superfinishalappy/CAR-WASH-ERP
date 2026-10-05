@@ -91,6 +91,7 @@ export interface Attendance {
   entry_date: string;
   staff_id: string;
   status: AttStatus;
+  daily_rate?: number;
   created_at?: string;
   staff_name?: string;
 }
