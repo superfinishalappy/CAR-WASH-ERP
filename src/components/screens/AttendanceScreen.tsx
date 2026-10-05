@@ -144,40 +144,6 @@ export function AttendanceScreen() {
     }
   };
 
-  // Instant Evening Cash Payout for Daily / Custom Performance Workers
-  const handleGiveEveningCash = async (staff: Profile, amount: number) => {
-    if (!canMarkDate) {
-      showToast('Attendance for past dates can only be updated by the Owner.', 'error');
-      return;
-    }
-    if (!amount || amount <= 0) {
-      showToast("Please enter an evening salary amount greater than 0 before paying cash.", 'error');
-      return;
-    }
-
-    // 1. Mark attendance as present with this daily wage
-    const attRes = dataProvider.markAttendance(staff.id, selectedDate, 'present', amount);
-    if (!attRes.success) {
-      showToast(attRes.error || 'Failed to update attendance', 'error');
-      return;
-    }
-
-    // 2. Record salary payout expense in cash
-    const expRes = dataProvider.recordSalaryPayment({
-      staff_id: staff.id,
-      entry_date: selectedDate,
-      amount,
-      payment_method: 'cash',
-      note: `Evening performance salary payout (${selectedDate})`,
-    });
-
-    if (expRes.success) {
-      showToast(`Paid ${amount} ${currency} cash to ${staff.full_name} for today's performance!`, 'success');
-      triggerRefresh();
-    } else {
-      showToast(expRes.error || 'Failed to record salary payout expense', 'error');
-    }
-  };
 
   // Mark all present
   const handleMarkAllPresent = () => {
@@ -440,15 +406,6 @@ export function AttendanceScreen() {
                     ? rec.daily_rate
                     : staff.pay_rate;
 
-                const todayPayout = dataProvider.getExpenses().find(
-                  (e) =>
-                    e.category === 'Staff Salary' &&
-                    e.entry_date === selectedDate &&
-                    (e.description?.includes(staff.id) ||
-                     e.description?.toLowerCase().includes(staff.full_name.toLowerCase()) ||
-                     e.description?.toLowerCase().includes(staff.username.toLowerCase()))
-                );
-
                 return (
                   <div
                     key={staff.id}
@@ -507,27 +464,6 @@ export function AttendanceScreen() {
                           />
                           <span className="text-[10px] font-bold text-slate-400">{currency}</span>
                         </div>
-                      )}
-
-                      {/* Evening Cash Payout Status / Button for Daily Workers */}
-                      {isDaily && (
-                        todayPayout ? (
-                          <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] border border-emerald-200 dark:border-emerald-800/50 inline-flex items-center gap-1 shadow-sm">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span>Paid {todayPayout.amount.toFixed(2)} {currency} Cash</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleGiveEveningCash(staff, currentRate)}
-                            disabled={!canMarkDate || !currentRate || currentRate <= 0}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95 shrink-0"
-                            title={`Pay ${currentRate || 0} ${currency} cash for today's performance`}
-                          >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            <span>Pay Cash</span>
-                          </button>
-                        )
                       )}
 
                       {/* Present / Leave Toggle */}
