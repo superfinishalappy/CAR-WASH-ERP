@@ -15,6 +15,12 @@ export interface Company {
   created_at: string;
 }
 
+export interface ProfilePayRateRecord {
+  effective_date: string;
+  pay_type: PayType;
+  pay_rate: number;
+}
+
 export interface Profile {
   id: string;
   company_id: string | null;
@@ -23,6 +29,7 @@ export interface Profile {
   role: AppRole;
   pay_type: PayType;
   pay_rate: number;
+  pay_history?: ProfilePayRateRecord[];
   active: boolean;
   created_at?: string;
 }
@@ -55,6 +62,8 @@ export interface Job {
   total: number;
   customer_id: string | null;
   is_paid: boolean;
+  commission_rate?: number;
+  commission_amount?: number;
   created_by: string;
   created_at?: string;
   // Joins

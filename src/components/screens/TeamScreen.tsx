@@ -20,6 +20,7 @@ import {
   AlertCircle,
   X,
   History,
+  Info,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 
@@ -36,6 +37,9 @@ export function TeamScreen() {
   // Modals
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [resetPassUser, setResetPassUser] = useState<Profile | null>(null);
+  const [editingPayStaff, setEditingPayStaff] = useState<Profile | null>(null);
+  const [editPayType, setEditPayType] = useState<PayType>('commission');
+  const [editPayRate, setEditPayRate] = useState('');
 
   // Add User Form State
   const [newUsername, setNewUsername] = useState('');
@@ -148,6 +152,34 @@ export function TeamScreen() {
       setUpdatedPassword('');
     } else {
       showToast(res.error || 'Failed to reset password', 'error');
+    }
+  };
+
+  const handleOpenEditPay = (p: Profile) => {
+    setEditingPayStaff(p);
+    setEditPayType(p.pay_type || 'none');
+    setEditPayRate(p.pay_rate ? String(p.pay_rate) : '');
+  };
+
+  const handleSavePayRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayStaff) return;
+
+    const res = await dataProvider.updateStaffPayRate(
+      editingPayStaff.id,
+      editPayType,
+      Number(editPayRate) || 0
+    );
+
+    if (res.success) {
+      showToast(
+        `Pay basis updated for ${editingPayStaff.full_name}. Future entries will use this rate while historical records remain locked.`,
+        'success'
+      );
+      setEditingPayStaff(null);
+      triggerRefresh();
+    } else {
+      showToast(res.error || 'Failed to update pay basis', 'error');
     }
   };
 
@@ -309,6 +341,12 @@ export function TeamScreen() {
                     <td className="py-3 px-4 text-right rtl:text-left space-x-2 rtl:space-x-reverse">
                       {isOwner && (
                         <>
+                          <button
+                            onClick={() => handleOpenEditPay(p)}
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-[11px] font-semibold border border-blue-200 dark:border-blue-800/40"
+                          >
+                            Edit Rate
+                          </button>
                           <button
                             onClick={() => setResetPassUser(p)}
                             className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700"
@@ -743,6 +781,89 @@ export function TeamScreen() {
                   className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
                 >
                   Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Staff Pay Rate & Basis */}
+      {editingPayStaff && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">Update Pay Basis</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {editingPayStaff.full_name} (@{editingPayStaff.username})
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingPayStaff(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePayRate} className="space-y-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 text-blue-900 dark:text-blue-200 text-xs flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong>Point-in-Time Lock Guarantee:</strong> Updating this rate applies <strong>only to new jobs and new attendance entries from this moment onward</strong>. All past jobs, previous attendance entries, and historical payroll remain locked at their historical rates!
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">Compensation Type</label>
+                <select
+                  value={editPayType}
+                  onChange={(e) => setEditPayType(e.target.value as PayType)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white font-medium"
+                >
+                  <option value="commission">Commission (% of Base Job Price)</option>
+                  <option value="daily">Daily Wage ({portalCurrency}/day present)</option>
+                  <option value="monthly">Monthly Fixed Salary ({portalCurrency}/month)</option>
+                  <option value="none">None / Hourly / External</option>
+                </select>
+              </div>
+
+              {editPayType !== 'none' && (
+                <div>
+                  <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">
+                    {editPayType === 'commission'
+                      ? 'Commission Rate (%)'
+                      : editPayType === 'daily'
+                      ? `Daily Wage (${portalCurrency}/day)`
+                      : `Monthly Salary (${portalCurrency}/month)`}
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={editPayRate}
+                    onChange={(e) => setEditPayRate(e.target.value)}
+                    placeholder="e.g. 35 for commission, 40 for daily, 4000 for monthly"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingPayStaff(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700"
+                >
+                  {t.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md shadow-blue-600/25 active:scale-95 transition"
+                >
+                  Save New Rate
                 </button>
               </div>
             </form>

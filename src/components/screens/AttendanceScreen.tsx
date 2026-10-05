@@ -103,6 +103,21 @@ export function AttendanceScreen() {
     setPeriodPreset(preset);
   };
 
+  // Reset custom daily wage inputs when changing dates to prevent bleed-through
+  useEffect(() => {
+    setDailyRates({});
+  }, [selectedDate]);
+
+  const getStaffRecord = (staffId: string): Attendance | undefined => {
+    return attendanceRecords.find((a) => a.staff_id === staffId);
+  };
+
+  const getStaffStatus = (staffId: string): 'present' | 'leave' | 'not_marked' => {
+    const rec = getStaffRecord(staffId);
+    if (!rec) return 'not_marked';
+    return rec.status;
+  };
+
   // Mark single staff attendance
   const handleMark = (staffId: string, status: 'present' | 'leave') => {
     if (!canMarkDate) {
@@ -111,9 +126,12 @@ export function AttendanceScreen() {
     }
 
     const staff = staffList.find((s) => s.id === staffId);
+    const rec = getStaffRecord(staffId);
     const customRate =
       dailyRates[staffId] !== undefined
         ? dailyRates[staffId]
+        : rec?.daily_rate !== undefined
+        ? rec.daily_rate
         : staff?.pay_type === 'daily'
         ? staff.pay_rate
         : undefined;
@@ -140,16 +158,6 @@ export function AttendanceScreen() {
     } else {
       showToast(res.error || 'Failed to mark all present', 'error');
     }
-  };
-
-  const getStaffStatus = (staffId: string): 'present' | 'leave' | 'not_marked' => {
-    const rec = attendanceRecords.find((a) => a.staff_id === staffId);
-    if (!rec) return 'not_marked';
-    return rec.status;
-  };
-
-  const getStaffRecord = (staffId: string): Attendance | undefined => {
-    return attendanceRecords.find((a) => a.staff_id === staffId);
   };
 
   const presentCount = attendanceRecords.filter((a) => a.status === 'present').length;

@@ -205,8 +205,42 @@ export class DataProvider {
         }
         saveCachedSession(this.currentSession);
       }
+
+      // Point-in-Time Lock Guarantee:
+      // Freeze rates on all historical entries loaded up to this moment
+      this.freezeHistoricalRates();
     } catch (err) {
       console.error('Failed to sync from Supabase:', err);
+    }
+  }
+
+  /**
+   * Point-in-Time Lock Guarantee:
+   * Permanently freeze/stamp historical commission rates and daily wages onto all records
+   * loaded up to this moment so that past entries are never retroactively corrupted by future rate changes.
+   */
+  public freezeHistoricalRates(): void {
+    // 1. Freeze historical commission rates on all existing jobs
+    for (const job of this.jobs) {
+      if (job.commission_rate === undefined) {
+        const staff = this.profiles.find((p) => p.id === job.staff_id);
+        if (staff && staff.pay_type === 'commission') {
+          job.commission_rate = Number(staff.pay_rate) || 0;
+          job.commission_amount = Math.round((job.price * (job.commission_rate / 100)) * 100) / 100;
+        }
+      } else if (job.commission_amount === undefined) {
+        job.commission_amount = Math.round((job.price * (job.commission_rate / 100)) * 100) / 100;
+      }
+    }
+
+    // 2. Freeze historical daily wages on all existing attendance records
+    for (const att of this.attendance) {
+      if (att.daily_rate === undefined && att.status === 'present') {
+        const staff = this.profiles.find((p) => p.id === att.staff_id);
+        if (staff && staff.pay_type === 'daily') {
+          att.daily_rate = Number(staff.pay_rate) || 0;
+        }
+      }
     }
   }
 
@@ -794,6 +828,63 @@ export class DataProvider {
     return { success: true, profile: p };
   }
 
+  public async updateStaffPayRate(
+    staffId: string,
+    payType: 'none' | 'commission' | 'daily' | 'monthly',
+    payRate: number
+  ): Promise<{ success: boolean; profile?: Profile; error?: string }> {
+    const profile = this.profiles.find((x) => x.id === staffId);
+    if (!profile) return { success: false, error: 'Staff profile not found' };
+
+    // Point-in-Time Lock Guarantee:
+    // Before updating the profile's rate, freeze and lock all existing jobs and attendance
+    // entries for this staff member at their historical rate active right up to this moment!
+    for (const job of this.jobs) {
+      if (job.staff_id === staffId && job.commission_rate === undefined && profile.pay_type === 'commission') {
+        job.commission_rate = Number(profile.pay_rate) || 0;
+        job.commission_amount = Math.round((job.price * (job.commission_rate / 100)) * 100) / 100;
+      }
+    }
+    for (const att of this.attendance) {
+      if (att.staff_id === staffId && att.daily_rate === undefined && profile.pay_type === 'daily' && att.status === 'present') {
+        att.daily_rate = Number(profile.pay_rate) || 0;
+      }
+    }
+
+    const old = { ...profile };
+    profile.pay_type = payType;
+    profile.pay_rate = Number(payRate) || 0;
+
+    // Track historical pay change timeline
+    if (!profile.pay_history) {
+      profile.pay_history = [];
+    }
+    profile.pay_history.push({
+      effective_date: getTodayString(),
+      pay_type: old.pay_type,
+      pay_rate: old.pay_rate,
+    });
+
+    this.logAudit('profiles', staffId, 'UPDATE', old, profile);
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          pay_type: profile.pay_type,
+          pay_rate: profile.pay_rate,
+        })
+        .eq('id', staffId);
+
+      if (error) {
+        console.error('Supabase updateStaffPayRate error:', error.message);
+        return { success: false, error: error.message };
+      }
+    }
+
+    return { success: true, profile };
+  }
+
   // Customers
   public getCustomers(companyId?: string): Customer[] {
     const cid = companyId || this.getEffectiveCompanyId();
@@ -1097,6 +1188,10 @@ export class DataProvider {
     const total = price + extra;
     const isPaid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
 
+    const staff = this.profiles.find((p) => p.id === data.staff_id);
+    const commRate = staff && staff.pay_type === 'commission' ? Number(staff.pay_rate) || 0 : undefined;
+    const commAmount = commRate !== undefined ? Math.round(price * (commRate / 100) * 100) / 100 : undefined;
+
     const job: Job = {
       id: generateUUID(),
       company_id: cid,
@@ -1111,6 +1206,8 @@ export class DataProvider {
       total,
       customer_id: data.customer_id || null,
       is_paid: isPaid,
+      commission_rate: commRate,
+      commission_amount: commAmount,
       created_by: this.currentSession?.user.id || '',
       created_at: new Date().toISOString(),
     };
@@ -1185,6 +1282,31 @@ export class DataProvider {
     job.total = price + extra;
     job.customer_id = data.customer_id || null;
     job.is_paid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
+
+    // Point-in-Time Lock Guarantee:
+    // If the staff member didn't change, strictly preserve the locked commission_rate from that moment!
+    // Even if price changes, recalculate using the locked historical rate, never the staff's current rate.
+    const staffChanged = data.staff_id !== old.staff_id;
+    if (staffChanged) {
+      const newStaff = this.profiles.find((p) => p.id === data.staff_id);
+      if (newStaff && newStaff.pay_type === 'commission') {
+        job.commission_rate = Number(newStaff.pay_rate) || 0;
+        job.commission_amount = Math.round(price * (job.commission_rate / 100) * 100) / 100;
+      } else {
+        job.commission_rate = undefined;
+        job.commission_amount = undefined;
+      }
+    } else {
+      if (job.commission_rate !== undefined) {
+        job.commission_amount = Math.round(price * (job.commission_rate / 100) * 100) / 100;
+      } else {
+        const staff = this.profiles.find((p) => p.id === data.staff_id);
+        if (staff && staff.pay_type === 'commission') {
+          job.commission_rate = Number(staff.pay_rate) || 0;
+          job.commission_amount = Math.round(price * (job.commission_rate / 100) * 100) / 100;
+        }
+      }
+    }
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
@@ -1599,12 +1721,10 @@ export class DataProvider {
       const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
 
       let totalDailyWage = 0;
-      if (staff.pay_type === 'daily') {
-        totalDailyWage = presentRecords.reduce((sum, r) => {
-          const rate = r.daily_rate !== undefined ? r.daily_rate : staff.pay_rate;
-          return sum + rate;
-        }, 0);
-      }
+      totalDailyWage = presentRecords.reduce((sum, r) => {
+        const rate = r.daily_rate !== undefined ? r.daily_rate : (staff.pay_type === 'daily' ? Number(staff.pay_rate) || 0 : 0);
+        return sum + rate;
+      }, 0);
 
       return {
         staff_id: staff.id,
@@ -1639,23 +1759,34 @@ export class DataProvider {
     }
 
     const staff = this.profiles.find((p) => p.id === staffId);
-    const resolvedRate = dailyRate !== undefined ? dailyRate : (staff?.pay_type === 'daily' ? staff.pay_rate : undefined);
-
     const existingIdx = this.attendance.findIndex((a) => a.staff_id === staffId && a.entry_date === date);
+
     if (existingIdx !== -1) {
-      const old = { ...this.attendance[existingIdx] };
-      this.attendance[existingIdx].status = status;
-      if (resolvedRate !== undefined) {
-        this.attendance[existingIdx].daily_rate = resolvedRate;
+      const existing = this.attendance[existingIdx];
+      const old = { ...existing };
+      existing.status = status;
+
+      // Point-in-Time Lock Guarantee:
+      // If caller provided an explicit dailyRate override, apply it;
+      // otherwise PRESERVE the existing historical daily_rate so old entries never change unexpectedly!
+      if (dailyRate !== undefined) {
+        existing.daily_rate = dailyRate;
+      } else if (existing.daily_rate === undefined && staff?.pay_type === 'daily') {
+        existing.daily_rate = Number(staff.pay_rate) || 0;
       }
-      this.logAudit('attendance', this.attendance[existingIdx].id, 'UPDATE', old, this.attendance[existingIdx]);
+
+      this.logAudit('attendance', existing.id, 'UPDATE', old, existing);
 
       if (supabase) {
-        supabase.from('attendance').update({ status }).eq('id', this.attendance[existingIdx].id).then(() => {});
+        supabase.from('attendance').update({ status }).eq('id', existing.id).then(() => {});
       }
 
-      return { success: true, attendance: this.attendance[existingIdx] };
+      return { success: true, attendance: existing };
     }
+
+    const resolvedRate = dailyRate !== undefined
+      ? dailyRate
+      : (staff?.pay_type === 'daily' ? Number(staff.pay_rate) || 0 : undefined);
 
     const att: Attendance = {
       id: generateUUID(),
@@ -1871,21 +2002,23 @@ export class DataProvider {
       const presentDays = sAtt.filter((t) => t.status === 'present').length;
       const leaveDays = sAtt.filter((t) => t.status === 'leave').length;
 
-      if (staff.pay_type === 'commission') {
-        // Commission: sum(price) * rate% (PRICE ONLY, extra_amount excluded!)
-        const priceSum = sJobs.reduce((sum, j) => sum + j.price, 0);
-        grossSalary = priceSum * (staff.pay_rate / 100);
-      } else if (staff.pay_type === 'daily') {
-        // Daily: sum of each present day's actual recorded rate (or fallback to staff.pay_rate)
-        const presentRecords = sAtt.filter((t) => t.status === 'present');
-        grossSalary = presentRecords.reduce((sum, r) => {
-          const rate = r.daily_rate !== undefined ? r.daily_rate : staff.pay_rate;
-          return sum + rate;
-        }, 0);
-      } else if (staff.pay_type === 'monthly') {
-        // Monthly: (rate / 30) * periodDays
-        grossSalary = (staff.pay_rate / 30) * periodDays;
-      }
+      // Point-in-Time Commission: sum of locked commissions for all jobs in period
+      const commEarned = sJobs.reduce((sum, j) => {
+        if (j.commission_amount !== undefined) return sum + j.commission_amount;
+        const rate = j.commission_rate !== undefined ? j.commission_rate : (staff.pay_type === 'commission' ? staff.pay_rate : 0);
+        return sum + (j.price * (rate / 100));
+      }, 0);
+
+      // Point-in-Time Daily Wage: sum of locked daily wages for all present days in period
+      const presentRecords = sAtt.filter((t) => t.status === 'present');
+      const dailyEarned = presentRecords.reduce((sum, r) => {
+        const rate = r.daily_rate !== undefined ? r.daily_rate : (staff.pay_type === 'daily' ? staff.pay_rate : 0);
+        return sum + rate;
+      }, 0);
+
+      const monthlyEarned = staff.pay_type === 'monthly' ? (staff.pay_rate / 30) * periodDays : 0;
+
+      grossSalary = commEarned + dailyEarned + monthlyEarned;
 
       // Advances in period
       const sAdv = this.advances
@@ -1941,17 +2074,23 @@ export class DataProvider {
 
     let prevSalary = 0;
     for (const staff of companyStaff) {
-      if (staff.pay_type === 'commission') {
-        const psJobs = prevJobs.filter((j) => j.staff_id === staff.id);
-        prevSalary += psJobs.reduce((sum, j) => sum + j.price, 0) * (staff.pay_rate / 100);
-      } else if (staff.pay_type === 'daily') {
-        const pPres = this.attendance.filter(
-          (t) => t.company_id === cid && t.staff_id === staff.id && t.entry_date >= prevStartStr && t.entry_date <= prevEndStr && t.status === 'present'
-        ).length;
-        prevSalary += staff.pay_rate * pPres;
-      } else if (staff.pay_type === 'monthly') {
-        prevSalary += (staff.pay_rate / 30) * periodDays;
-      }
+      const psJobs = prevJobs.filter((j) => j.staff_id === staff.id);
+      const prevComm = psJobs.reduce((sum, j) => {
+        if (j.commission_amount !== undefined) return sum + j.commission_amount;
+        const rate = j.commission_rate !== undefined ? j.commission_rate : (staff.pay_type === 'commission' ? staff.pay_rate : 0);
+        return sum + (j.price * (rate / 100));
+      }, 0);
+
+      const pPres = this.attendance.filter(
+        (t) => t.company_id === cid && t.staff_id === staff.id && t.entry_date >= prevStartStr && t.entry_date <= prevEndStr && t.status === 'present'
+      );
+      const prevDaily = pPres.reduce((sum, att) => {
+        const rate = att.daily_rate !== undefined ? att.daily_rate : (staff.pay_type === 'daily' ? staff.pay_rate : 0);
+        return sum + rate;
+      }, 0);
+
+      const prevMonthly = staff.pay_type === 'monthly' ? (staff.pay_rate / 30) * periodDays : 0;
+      prevSalary += prevComm + prevDaily + prevMonthly;
     }
     const prevNet = prevRevenue - prevExpenses - prevSalary;
     const salesGrowth = prevRevenue > 0 ? (revenue - prevRevenue) / prevRevenue : 0;
@@ -2177,19 +2316,23 @@ export class DataProvider {
     for (const j of pJobs) {
       if (!staffSalaryPaidDates.has(j.entry_date) && dailyMap[j.entry_date]) {
         const staff = companyStaff.find((s) => s.id === j.staff_id);
-        if (staff && staff.pay_type === 'commission') {
-          dailyMap[j.entry_date].expenses += (j.price * staff.pay_rate) / 100;
-        }
+        const commAmt = j.commission_amount !== undefined
+          ? j.commission_amount
+          : (staff && staff.pay_type === 'commission' ? (j.price * (j.commission_rate ?? staff.pay_rate)) / 100 : 0);
+        dailyMap[j.entry_date].expenses += commAmt;
       }
     }
 
-    for (const staff of companyStaff.filter((s) => s.pay_type === 'daily')) {
+    for (const staff of companyStaff) {
       const atts = this.attendance.filter(
         (a) => a.staff_id === staff.id && a.entry_date >= startDate && a.entry_date <= endDate && a.status === 'present'
       );
       for (const att of atts) {
         if (!staffSalaryPaidDates.has(att.entry_date) && dailyMap[att.entry_date]) {
-          dailyMap[att.entry_date].expenses += staff.pay_rate;
+          const wage = att.daily_rate !== undefined
+            ? att.daily_rate
+            : (staff.pay_type === 'daily' ? staff.pay_rate : 0);
+          dailyMap[att.entry_date].expenses += wage;
         }
       }
     }
