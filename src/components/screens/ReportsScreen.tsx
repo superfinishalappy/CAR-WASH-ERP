@@ -826,7 +826,7 @@ export function ReportsScreen() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.reports.staffPayroll.title}</h2>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            Commission on total vehicle amount (price + extra) · Daily / Performance wages · Advances deducted
+            Commission on base price only (extra excluded) · Daily / Performance wages · Advances deducted
           </span>
         </div>
 
@@ -856,7 +856,7 @@ export function ReportsScreen() {
                     <span className="capitalize">{s.pay_type}</span>{' '}
                     <span className="text-slate-500 dark:text-slate-400">
                       ({s.pay_type === 'commission'
-                        ? `${s.pay_rate}% Commission`
+                        ? `${s.pay_rate}% of Base`
                         : s.pay_type === 'daily' && Number(s.pay_rate) === 0
                         ? 'Custom (Evening Decided)'
                         : s.pay_type === 'daily'
@@ -867,7 +867,7 @@ export function ReportsScreen() {
                   <td className="py-3 px-4 text-center font-bold text-blue-600 dark:text-blue-400">
                     {s.jobs_count}{' '}
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-normal">
-                      ({s.jobs_sales.toFixed(2)} AED)
+                      ({s.jobs_sales.toFixed(2)} {currency} Base)
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center text-slate-700 dark:text-slate-300">
