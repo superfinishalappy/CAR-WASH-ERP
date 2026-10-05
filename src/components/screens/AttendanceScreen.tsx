@@ -144,6 +144,41 @@ export function AttendanceScreen() {
     }
   };
 
+  // Instant Evening Cash Payout for Daily / Custom Performance Workers
+  const handleGiveEveningCash = async (staff: Profile, amount: number) => {
+    if (!canMarkDate) {
+      showToast('Attendance for past dates can only be updated by the Owner.', 'error');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      showToast("Please enter an evening salary amount greater than 0 before paying cash.", 'error');
+      return;
+    }
+
+    // 1. Mark attendance as present with this daily wage
+    const attRes = dataProvider.markAttendance(staff.id, selectedDate, 'present', amount);
+    if (!attRes.success) {
+      showToast(attRes.error || 'Failed to update attendance', 'error');
+      return;
+    }
+
+    // 2. Record salary payout expense in cash
+    const expRes = dataProvider.recordSalaryPayment({
+      staff_id: staff.id,
+      entry_date: selectedDate,
+      amount,
+      payment_method: 'cash',
+      note: `Evening performance salary payout (${selectedDate})`,
+    });
+
+    if (expRes.success) {
+      showToast(`Paid ${amount} ${currency} cash to ${staff.full_name} for today's performance!`, 'success');
+      triggerRefresh();
+    } else {
+      showToast(expRes.error || 'Failed to record salary payout expense', 'error');
+    }
+  };
+
   // Mark all present
   const handleMarkAllPresent = () => {
     if (!canMarkDate) {
@@ -208,8 +243,8 @@ export function AttendanceScreen() {
           'Staff Name': s.full_name,
           Username: `@${s.username}`,
           Role: s.role,
-          'Pay Basis': s.pay_type,
-          'Base Rate': s.pay_rate,
+          'Pay Basis': s.pay_type === 'daily' && Number(s.pay_rate) === 0 ? 'Custom Performance' : s.pay_type,
+          'Base Rate': s.pay_type === 'daily' && Number(s.pay_rate) === 0 ? 'Performance Decided' : s.pay_rate,
           'Period Start': startDate,
           'Period End': endDate,
           'Total Days': s.totalDays,
@@ -397,12 +432,22 @@ export function AttendanceScreen() {
                 const status = getStaffStatus(staff.id);
                 const rec = getStaffRecord(staff.id);
                 const isDaily = staff.pay_type === 'daily';
+                const isCustomPerf = isDaily && (!staff.pay_rate || Number(staff.pay_rate) === 0);
                 const currentRate =
                   dailyRates[staff.id] !== undefined
                     ? dailyRates[staff.id]
                     : rec?.daily_rate !== undefined
                     ? rec.daily_rate
                     : staff.pay_rate;
+
+                const todayPayout = dataProvider.getExpenses().find(
+                  (e) =>
+                    e.category === 'Staff Salary' &&
+                    e.entry_date === selectedDate &&
+                    (e.description?.includes(staff.id) ||
+                     e.description?.toLowerCase().includes(staff.full_name.toLowerCase()) ||
+                     e.description?.toLowerCase().includes(staff.username.toLowerCase()))
+                );
 
                 return (
                   <div
@@ -415,15 +460,22 @@ export function AttendanceScreen() {
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                           {staff.role}
                         </span>
+                        {isCustomPerf && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                            Custom Performance
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
                         <span className="capitalize font-mono text-blue-600 dark:text-blue-400">@{staff.username}</span>
                         <span>·</span>
                         <span className="capitalize text-slate-700 dark:text-slate-300">
                           {staff.pay_type === 'daily'
-                            ? `Daily Base: ${staff.pay_rate} ${currency}/day`
+                            ? (Number(staff.pay_rate) === 0
+                                ? 'Custom Performance Wage (Decided in Evening)'
+                                : `Daily Base: ${staff.pay_rate} ${currency}/day`)
                             : staff.pay_type === 'commission'
-                            ? `Commission: ${staff.pay_rate}% of Base Price`
+                            ? `Commission: ${staff.pay_rate}% of Total Sales`
                             : staff.pay_type === 'monthly'
                             ? `Monthly: ${staff.pay_rate} ${currency}`
                             : 'No salary basis'}
@@ -433,25 +485,49 @@ export function AttendanceScreen() {
 
                     {/* Actions & Day Wage Override */}
                     <div className="flex flex-wrap items-center gap-3">
-                      {/* Daily Wage input if daily worker */}
+                      {/* Daily / Performance Wage input if daily worker */}
                       {isDaily && (
                         <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/60">
-                          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Day Wage:</span>
+                          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            {isCustomPerf ? 'Evening Pay:' : 'Day Wage:'}
+                          </span>
                           <input
                             type="number"
                             min="0"
                             step="1"
                             disabled={!canMarkDate}
-                            value={currentRate}
+                            value={currentRate || ''}
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setDailyRates((prev) => ({ ...prev, [staff.id]: val }));
                             }}
                             className="w-16 px-2 py-0.5 text-xs font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-right font-mono focus:ring-1 focus:ring-blue-500"
-                            title="Adjust rate for this specific day (e.g. 40, 42, 50)"
+                            placeholder="0"
+                            title={isCustomPerf ? "Enter today's decided evening pay" : "Adjust rate for this specific day (e.g. 40, 42, 50)"}
                           />
                           <span className="text-[10px] font-bold text-slate-400">{currency}</span>
                         </div>
+                      )}
+
+                      {/* Evening Cash Payout Status / Button for Daily Workers */}
+                      {isDaily && (
+                        todayPayout ? (
+                          <span className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] border border-emerald-200 dark:border-emerald-800/50 inline-flex items-center gap-1 shadow-sm">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Paid {todayPayout.amount.toFixed(2)} {currency} Cash</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleGiveEveningCash(staff, currentRate)}
+                            disabled={!canMarkDate || !currentRate || currentRate <= 0}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95 shrink-0"
+                            title={`Pay ${currentRate || 0} ${currency} cash for today's performance`}
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            <span>Pay Cash</span>
+                          </button>
+                        )
                       )}
 
                       {/* Present / Leave Toggle */}

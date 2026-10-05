@@ -21,6 +21,7 @@ import {
   X,
   History,
   Info,
+  Sparkles,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 
@@ -114,12 +115,15 @@ export function TeamScreen() {
       return;
     }
 
+    const actualPayType = (newPayType as string) === 'custom_daily' ? 'daily' : newPayType;
+    const actualPayRate = (newPayType as string) === 'custom_daily' ? 0 : (Number(newPayRate) || 0);
+
     const res = await dataProvider.createCompanyUser({
       username: newUsername,
       full_name: newFullName,
       role: newRole,
-      pay_type: newPayType,
-      pay_rate: Number(newPayRate) || 0,
+      pay_type: actualPayType as PayType,
+      pay_rate: actualPayRate,
       password: newPassword,
     });
 
@@ -157,18 +161,26 @@ export function TeamScreen() {
 
   const handleOpenEditPay = (p: Profile) => {
     setEditingPayStaff(p);
-    setEditPayType(p.pay_type || 'none');
-    setEditPayRate(p.pay_rate ? String(p.pay_rate) : '');
+    if (p.pay_type === 'daily' && (!p.pay_rate || Number(p.pay_rate) === 0)) {
+      setEditPayType('custom_daily' as any);
+      setEditPayRate('0');
+    } else {
+      setEditPayType(p.pay_type || 'none');
+      setEditPayRate(p.pay_rate ? String(p.pay_rate) : '');
+    }
   };
 
   const handleSavePayRate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPayStaff) return;
 
+    const actualPayType = (editPayType as string) === 'custom_daily' ? 'daily' : editPayType;
+    const actualPayRate = (editPayType as string) === 'custom_daily' ? 0 : (Number(editPayRate) || 0);
+
     const res = await dataProvider.updateStaffPayRate(
       editingPayStaff.id,
-      editPayType,
-      Number(editPayRate) || 0
+      actualPayType as PayType,
+      actualPayRate
     );
 
     if (res.success) {
@@ -319,13 +331,19 @@ export function TeamScreen() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
-                      {p.pay_type === 'commission'
-                        ? `Commission (${p.pay_rate}%)`
-                        : p.pay_type === 'daily'
-                        ? `Daily (${p.pay_rate} AED)`
-                        : p.pay_type === 'monthly'
-                        ? `Monthly (${p.pay_rate} AED)`
-                        : 'None'}
+                      {p.pay_type === 'commission' ? (
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">Commission ({p.pay_rate}%)</span>
+                      ) : p.pay_type === 'daily' && Number(p.pay_rate) === 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40">
+                          Custom (Evening Decided)
+                        </span>
+                      ) : p.pay_type === 'daily' ? (
+                        <span>Daily ({p.pay_rate} {portalCurrency})</span>
+                      ) : p.pay_type === 'monthly' ? (
+                        <span>Monthly ({p.pay_rate} {portalCurrency})</span>
+                      ) : (
+                        <span className="text-slate-400">None</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       {p.active ? (
@@ -689,27 +707,43 @@ export function TeamScreen() {
                   <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">{t.team.payType}</label>
                   <select
                     value={newPayType}
-                    onChange={(e) => setNewPayType(e.target.value as PayType)}
+                    onChange={(e) => {
+                      const val = e.target.value as any;
+                      setNewPayType(val);
+                      if (val === 'custom_daily') {
+                        setNewPayRate('0');
+                      }
+                    }}
                     className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white"
                   >
-                    <option value="commission">Commission (%)</option>
-                    <option value="daily">Daily Wage (AED)</option>
-                    <option value="monthly">Monthly Salary (AED)</option>
+                    <option value="commission">Commission (% of Total Sales)</option>
+                    <option value="daily">Fixed Daily Wage ({portalCurrency}/day)</option>
+                    <option value="custom_daily">Custom / Evening Performance Salary</option>
+                    <option value="monthly">Monthly Fixed Salary ({portalCurrency}/month)</option>
                     <option value="none">None</option>
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">{t.team.payRate}</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={newPayRate}
-                  onChange={(e) => setNewPayRate(e.target.value)}
-                  placeholder="e.g. 35 for commission, 120 for daily"
-                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white"
-                />
-              </div>
+              {(newPayType as string) === 'custom_daily' ? (
+                <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Custom Performance Salary:</strong> No fixed rate. Evaluate worker in the evening and enter/pay their wage directly in Attendance.
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">{t.team.payRate}</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newPayRate}
+                    onChange={(e) => setNewPayRate(e.target.value)}
+                    placeholder="e.g. 35 for commission, 120 for daily"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              )}
               <div>
                 <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">{t.team.password}</label>
                 <input
@@ -819,17 +853,34 @@ export function TeamScreen() {
                 <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">Compensation Type</label>
                 <select
                   value={editPayType}
-                  onChange={(e) => setEditPayType(e.target.value as PayType)}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setEditPayType(val);
+                    if (val === 'custom_daily') {
+                      setEditPayRate('0');
+                    }
+                  }}
                   className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white font-medium"
                 >
-                  <option value="commission">Commission (% of Base Job Price)</option>
-                  <option value="daily">Daily Wage ({portalCurrency}/day present)</option>
+                  <option value="commission">Commission (% of Total Job Sales: Price + Extra)</option>
+                  <option value="daily">Fixed Daily Wage ({portalCurrency}/day present)</option>
+                  <option value="custom_daily">Custom / Evening Performance Salary (Decided daily in evening)</option>
                   <option value="monthly">Monthly Fixed Salary ({portalCurrency}/month)</option>
                   <option value="none">None / Hourly / External</option>
                 </select>
               </div>
 
-              {editPayType !== 'none' && (
+              {(editPayType as string) === 'custom_daily' ? (
+                <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40 text-purple-900 dark:text-purple-200 text-xs space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Custom / Evening Performance Salary</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    This staff member has no fixed salary. When they come to work, evaluate their performance in the evening and decide their salary for that day (e.g. 50, 75 {portalCurrency}). You can enter their pay and click <strong>Pay Cash</strong> directly in the Attendance Roll-Call screen.
+                  </p>
+                </div>
+              ) : editPayType !== 'none' && (
                 <div>
                   <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">
                     {editPayType === 'commission'

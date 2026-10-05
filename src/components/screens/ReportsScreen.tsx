@@ -47,6 +47,7 @@ export function ReportsScreen() {
   const { session, showToast, t, dataVersion, theme, triggerRefresh } = useApp();
 
   const tz = session?.company?.timezone;
+  const currency = session?.company?.currency || 'AED';
   const todayStr = getTodayString(tz);
   const [periodPreset, setPeriodPreset] = useState<'today' | 'this_month' | 'last_month' | 'custom'>('today');
   const [startDate, setStartDate] = useState(todayStr);
@@ -365,7 +366,12 @@ export function ReportsScreen() {
             <span className="hidden sm:inline">XLSX</span>
           </button>
           <button
-            onClick={() => printElement('printable-report')}
+            onClick={() =>
+              printElement(
+                'printable-report',
+                `${session?.company?.name || 'Super Finish'} - Performance Report`
+              )
+            }
             className="p-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1 transition shadow-sm"
             title="Print Report"
           >
@@ -435,14 +441,14 @@ export function ReportsScreen() {
           <div className="text-[10px] text-emerald-600 dark:text-emerald-500/80 mt-1">Paid counter & settled</div>
         </div>
 
-        {/* 6. Period Unpaid */}
-        <div className="p-4 rounded-3xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/30 shadow-sm dark:shadow-xl backdrop-blur-md">
-          <div className="text-xs text-rose-700 dark:text-rose-400 flex items-center justify-between font-medium">
+        {/* 6. Period Unpaid (Restored) */}
+        <div className="p-4 rounded-3xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 shadow-sm dark:shadow-xl backdrop-blur-md">
+          <div className="text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between font-medium">
             <span>Period Unpaid</span>
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-black text-rose-800 dark:text-rose-300 mt-1">{kpis.unpaid.toFixed(2)}</div>
-          <div className="text-[10px] text-rose-600 dark:text-rose-500/80 mt-1">Revenue - Collected</div>
+          <div className="text-2xl font-black text-amber-900 dark:text-amber-200 mt-1">{kpis.unpaid.toFixed(2)}</div>
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Unsettled in this period</div>
         </div>
 
         {/* 7. Customer Balances Due */}
@@ -820,7 +826,7 @@ export function ReportsScreen() {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.reports.staffPayroll.title}</h2>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            Commission on price only (extra excluded) · Daily on present days · Advances deducted
+            Commission on total vehicle amount (price + extra) · Daily / Performance wages · Advances deducted
           </span>
         </div>
 
@@ -849,7 +855,13 @@ export function ReportsScreen() {
                   <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
                     <span className="capitalize">{s.pay_type}</span>{' '}
                     <span className="text-slate-500 dark:text-slate-400">
-                      ({s.pay_type === 'commission' ? `${s.pay_rate}% of Base` : s.pay_type === 'daily' ? `${s.pay_rate} AED/day` : `${s.pay_rate} AED/mo`})
+                      ({s.pay_type === 'commission'
+                        ? `${s.pay_rate}% Commission`
+                        : s.pay_type === 'daily' && Number(s.pay_rate) === 0
+                        ? 'Custom (Evening Decided)'
+                        : s.pay_type === 'daily'
+                        ? `${s.pay_rate} ${currency}/day`
+                        : `${s.pay_rate} ${currency}/mo`})
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center font-bold text-blue-600 dark:text-blue-400">
@@ -895,65 +907,6 @@ export function ReportsScreen() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Unpaid Walk-in Vehicles (Oldest First with Call Buttons) */}
-      <div className="rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl transition-colors">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.reports.unpaidVehicles.title}</h2>
-          <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
-            {report.unpaid_vehicles.length} vehicles pending settlement
-          </span>
-        </div>
-
-        {report.unpaid_vehicles.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs">
-            {t.reports.unpaidVehicles.none}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left rtl:text-right">
-              <thead className="bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-2.5 px-4">{t.reports.unpaidVehicles.date}</th>
-                  <th className="py-2.5 px-4">{t.reports.unpaidVehicles.plate}</th>
-                  <th className="py-2.5 px-4">{t.reports.unpaidVehicles.service}</th>
-                  <th className="py-2.5 px-4">Staff</th>
-                  <th className="py-2.5 px-4 text-right rtl:text-left">{t.reports.unpaidVehicles.amount}</th>
-                  <th className="py-2.5 px-4 text-right rtl:text-left">{t.common.actions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
-                {report.unpaid_vehicles.map((v) => (
-                  <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400">{v.entry_date}</td>
-                    <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white font-mono">{v.plate || 'No plate'}</td>
-                    <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">
-                      {v.work_type} · {v.vehicle_type}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">{v.staff_name}</td>
-                    <td className="py-2.5 px-4 text-right rtl:text-left font-bold text-rose-600 dark:text-rose-400">
-                      {v.total.toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-4 text-right rtl:text-left">
-                      {v.mobile ? (
-                        <a
-                          href={`tel:${v.mobile}`}
-                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] inline-flex items-center gap-1 shadow-md shadow-blue-600/20"
-                        >
-                          <Phone className="w-3 h-3" />
-                          {t.reports.unpaidVehicles.call}
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">No Phone</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* Pay Salary & Wage Modal */}

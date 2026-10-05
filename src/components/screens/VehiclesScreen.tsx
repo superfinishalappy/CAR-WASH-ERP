@@ -24,10 +24,12 @@ import {
   RotateCcw,
   CalendarCheck,
   Receipt,
+  Printer,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString, getYesterdayString } from '@/lib/date-utils';
+import { ProfessionalInvoiceModal } from '@/components/common/ProfessionalInvoiceModal';
 
 export function VehiclesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, setActiveTab, currency } = useApp();
@@ -59,10 +61,11 @@ export function VehiclesScreen() {
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Edit / Delete Modal State
+  // Edit / Delete / Invoice Modal State
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [constraintModalJob, setConstraintModalJob] = useState<Job | null>(null);
+  const [invoiceJob, setInvoiceJob] = useState<Job | null>(null);
 
   // Customer Warning State
   const [selectedCustomerWarning, setSelectedCustomerWarning] = useState<string | null>(null);
@@ -396,14 +399,14 @@ export function VehiclesScreen() {
           <div className="text-xl font-black text-indigo-900 dark:text-indigo-200 mt-1">
             {totalBase.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
           </div>
-          <div className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">Staff Commission Base</div>
+          <div className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">Base Service Value</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
           <div className="text-xs text-amber-700 dark:text-amber-400 font-medium">Extra Amount</div>
           <div className="text-xl font-black text-amber-900 dark:text-amber-200 mt-1">
             {totalExtra.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
           </div>
-          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80">100% Garage Revenue</div>
+          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Add-on & Polish Value</div>
         </div>
         <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
           <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{t.vehicles.paid}</div>
@@ -807,7 +810,21 @@ export function VehiclesScreen() {
                           <div className="font-mono font-bold text-slate-900 dark:text-slate-200">
                             {job.plate || 'NO PLATE'}
                           </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">{job.mobile || '-'}</div>
+                          {job.mobile ? (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">{job.mobile}</span>
+                              <a
+                                href={`tel:${job.mobile}`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/40 font-bold text-[10px] transition"
+                                title="Call Customer Directly"
+                              >
+                                <Phone className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                <span>Call</span>
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400">-</div>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <span className="font-semibold text-slate-900 dark:text-white">{job.work_type}</span>
@@ -865,7 +882,14 @@ export function VehiclesScreen() {
                             </button>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right rtl:text-left space-x-2 rtl:space-x-reverse">
+                        <td className="py-3 px-4 text-right rtl:text-left space-x-1.5 rtl:space-x-reverse">
+                          <button
+                            onClick={() => setInvoiceJob(job)}
+                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40 transition"
+                            title="Print / View Invoice"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
                           {canEdit && (
                             <button
                               onClick={() => setEditingJob(job)}
@@ -920,6 +944,13 @@ export function VehiclesScreen() {
                       </div>
 
                       <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setInvoiceJob(job)}
+                          className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40"
+                          title="Print / View Invoice"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
                         {canEdit && (
                           <button
                             onClick={() => setEditingJob(job)}
@@ -964,8 +995,17 @@ export function VehiclesScreen() {
 
                       {job.mobile && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 dark:text-slate-400 font-medium">Mobile:</span>
-                          <span className="font-mono text-slate-600 dark:text-slate-400">{job.mobile}</span>
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">Customer Mobile:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-slate-700 dark:text-slate-300 text-xs font-semibold">{job.mobile}</span>
+                            <a
+                              href={`tel:${job.mobile}`}
+                              className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold text-xs inline-flex items-center gap-1 shadow-sm"
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span>Call</span>
+                            </a>
+                          </div>
                         </div>
                       )}
 
@@ -1234,6 +1274,17 @@ export function VehiclesScreen() {
             : undefined
         }
       />
+
+      {/* Professional Invoice / Receipt Modal */}
+      {invoiceJob && (
+        <ProfessionalInvoiceModal
+          job={invoiceJob}
+          company={session?.company || null}
+          currency={currency}
+          onClose={() => setInvoiceJob(null)}
+          onTogglePayment={handleTogglePayment}
+        />
+      )}
     </div>
   );
 }
