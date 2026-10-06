@@ -121,8 +121,8 @@ export class DataProvider {
         }
       }
 
-      // 4. Customers
-      let custQuery = supabase.from('customers').select('*').order('created_at', { ascending: false });
+      // 4. Customers (Safeguarded to most recent 2,500 records)
+      let custQuery = supabase.from('customers').select('*').order('created_at', { ascending: false }).limit(2500);
       if (!isPlatform && cid) {
         custQuery = custQuery.eq('company_id', cid);
       }

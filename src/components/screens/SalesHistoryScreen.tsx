@@ -399,6 +399,7 @@ export function SalesHistoryScreen() {
       </div>
 
       {/* Top Summary KPI Cards - Total Revenue, Base Amount, Extra Amount, Paid, Unpaid, Avg */}
+      {(isOwner || isManager) && (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Filtered Sales */}
         <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
@@ -490,6 +491,7 @@ export function SalesHistoryScreen() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Filter Bar Card */}
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
@@ -545,12 +547,10 @@ export function SalesHistoryScreen() {
           <div className="flex items-center flex-wrap gap-1.5 text-xs">
             <span className="text-slate-400 text-[11px] mr-1 hidden sm:inline">Date:</span>
             {[
-              { id: 'all', label: 'All Time' },
-              { id: 'today', label: 'Today' },
+                            { id: 'today', label: 'Today' },
               { id: 'yesterday', label: 'Yesterday' },
               { id: 'week', label: 'Last 7 Days' },
-              { id: 'month', label: 'This Month' },
-              { id: 'custom', label: 'Custom Range' },
+              ...(isOwner || isManager ? [{ id: 'month', label: 'This Month' }, { id: 'custom', label: 'Custom Range' }] : []),
             ].map((d) => (
               <button
                 key={d.id}
