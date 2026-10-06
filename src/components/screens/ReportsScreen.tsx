@@ -45,6 +45,8 @@ const VEHICLE_COLORS = ['#10b981', '#06b6d4', '#f59e0b', '#ec4899', '#8b5cf6', '
 
 export function ReportsScreen() {
   const { session, showToast, t, dataVersion, theme, triggerRefresh } = useApp();
+  const role = session?.profile.role || 'staff';
+  const isSeniorStaff = role === 'senior_staff';
 
   const tz = session?.company?.timezone;
   const currency = session?.company?.currency || 'AED';
@@ -390,8 +392,10 @@ export function ReportsScreen() {
       </div>
 
       {/* KPI Cards Grid (12 Core Metrics: Revenue Breakdown, Clean OPEX, Payroll, Profits, Health) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* 1. Vehicles Count */}
+      {!isSeniorStaff && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* 1. Vehicles Count */}
         <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
             <span>{t.reports.kpis.vehicles}</span>
@@ -820,6 +824,8 @@ export function ReportsScreen() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Staff Performance & Payroll Table */}
       <div className="rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl transition-colors">
