@@ -366,6 +366,8 @@ export async function renderDocumentToCanvasFile(
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('Could not generate image from canvas');
 
-  const cleanFilename = filename.endsWith('.png') ? filename : `${filename}.png`;
-  return new File([blob], cleanFilename, { type: 'image/png', lastModified: Date.now() });
+  // Strict sanitization for iOS Safari & Android: no spaces, only alphanumeric and hyphens
+  const baseName = filename.replace(/\.(png|jpe?g|pdf)$/i, '').replace(/[^a-zA-Z0-9_-]+/g, '-');
+  const safeFilename = `${baseName || 'invoice'}.png`;
+  return new File([blob], safeFilename, { type: 'image/png', lastModified: Date.now() });
 }

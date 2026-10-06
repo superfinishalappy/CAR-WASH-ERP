@@ -140,11 +140,14 @@ export default function PublicInvoicePage() {
           files: [fileToShare],
         });
       } else {
+        const isHttp = typeof window !== 'undefined' && window.location.protocol === 'http:' && window.location.hostname !== 'localhost';
         setShareToast({
-          message: 'Native share is not supported on this browser.',
+          message: isHttp
+            ? 'Mobile share requires HTTPS. Please deploy to Vercel or use HTTPS tunnel.'
+            : 'Native share is not supported on this browser.',
           type: 'error',
         });
-        setTimeout(() => setShareToast(null), 4000);
+        setTimeout(() => setShareToast(null), 5000);
       }
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
