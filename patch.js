@@ -1,0 +1,13 @@
+const fs = require('fs');
+const p = 'c:/Users/LENOVO/Desktop/CAR WASH ERP/src/components/screens/SalesHistoryScreen.tsx';
+let c = fs.readFileSync(p, 'utf8');
+c = c.replace(/\{\(isOwner \|\| isManager\) && \(\r?\n\s*<div className="grid/g, '<div className="grid');
+c = c.replace(/\s*<\/div>\r?\n\s*\)\}\r?\n\s*\{\/\* Filter Bar/g, '\n      </div>\n\n      {/* Filter Bar');
+c = c.replace(/\{\/\* Base Amount \*\/}\r?\n\s*<div/g, '{/* Base Amount */}\n        {(isOwner || isManager) && (<div');
+c = c.replace(/Standard service\r?\n\s*<\/div>\r?\n\s*<\/div>/g, 'Standard service\n          </div>\n        </div>)}');
+c = c.replace(/\{\/\* Extra Amount \*\/}\r?\n\s*<div/g, '{/* Extra Amount */}\n        {(isOwner || isManager) && (<div');
+c = c.replace(/100% Workshop\r?\n\s*<\/div>\r?\n\s*<\/div>/g, '100% Workshop\n          </div>\n        </div>)}');
+c = c.replace(/\{\/\* Average Job Value \*\/}\r?\n\s*<div/g, '{/* Average Job Value */}\n        {(isOwner || isManager) && (<div');
+c = c.replace(/Per vehicle\r?\n\s*<\/div>\r?\n\s*<\/div>\r?\n\s*<\/div>/g, 'Per vehicle\n          </div>\n        </div>)}\n      </div>');
+fs.writeFileSync(p, c, 'utf8');
+console.log('done');

@@ -399,7 +399,6 @@ export function SalesHistoryScreen() {
       </div>
 
       {/* Top Summary KPI Cards - Total Revenue, Base Amount, Extra Amount, Paid, Unpaid, Avg */}
-      {(isOwner || isManager) && (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Filtered Sales */}
         <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
@@ -417,7 +416,7 @@ export function SalesHistoryScreen() {
         </div>
 
         {/* Base Amount */}
-        <div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-blue-700 dark:text-blue-400 font-medium">
             <span>Base Price</span>
             <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -429,10 +428,10 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-semibold">
             Standard service
           </div>
-        </div>
+        </div>)}
 
         {/* Extra Amount */}
-        <div className="p-4 rounded-3xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-400 font-medium">
             <span>Extra Polish/Addons</span>
             <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -444,7 +443,7 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-semibold">
             100% Workshop
           </div>
-        </div>
+        </div>)}
 
         {/* Total Paid Sales */}
         <div className="p-4 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
@@ -477,7 +476,7 @@ export function SalesHistoryScreen() {
         </div>
 
         {/* Average Job Value */}
-        <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span>Avg Ticket</span>
             <DollarSign className="w-4 h-4 text-indigo-500" />
@@ -489,9 +488,8 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-slate-500 mt-1 font-semibold">
             Per vehicle
           </div>
-        </div>
+        </div>)}
       </div>
-      )}
 
       {/* Filter Bar Card */}
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
