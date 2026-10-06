@@ -155,7 +155,7 @@ export function MobileDrawer() {
             </div>
             <div>
               <h2 className="font-black text-sm text-slate-900 dark:text-white truncate max-w-[180px]">
-                {company ? company.name : 'Garage ERP'}
+                {company ? company.name : 'Super Finish'}
               </h2>
               <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
                 <span>{company ? company.code : 'PORTAL'}</span>

@@ -862,7 +862,7 @@ export function TeamScreen() {
                   }}
                   className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white font-medium"
                 >
-                  <option value="commission">Commission (% of Total Job Sales: Price + Extra)</option>
+                  <option value="commission">Commission (% of Base Job Price)</option>
                   <option value="daily">Fixed Daily Wage ({portalCurrency}/day present)</option>
                   <option value="custom_daily">Custom / Evening Performance Salary (Decided daily in evening)</option>
                   <option value="monthly">Monthly Fixed Salary ({portalCurrency}/month)</option>
@@ -877,7 +877,7 @@ export function TeamScreen() {
                     <span>Custom / Evening Performance Salary</span>
                   </div>
                   <p className="leading-relaxed">
-                    This staff member has no fixed salary. When they come to work, evaluate their performance in the evening and decide their salary for that day (e.g. 50, 75 {portalCurrency}). You can enter their pay and click <strong>Pay Cash</strong> directly in the Attendance Roll-Call screen.
+                    This staff member has no fixed salary. When they come to work, evaluate their performance in the evening and enter their decided wage (e.g. 50, 75 {portalCurrency}) directly in the Attendance Roll-Call screen. Payouts are settled in Staff Payroll.
                   </p>
                 </div>
               ) : editPayType !== 'none' && (

@@ -132,6 +132,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const actingCompany = session?.actingCompany || null;
+
+  // Keep browser document title synced with active workshop name
+  useEffect(() => {
+    const compName = actingCompany?.name || session?.company?.name;
+    if (compName && typeof document !== 'undefined') {
+      document.title = compName;
+    }
+  }, [session, actingCompany]);
+
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('garage_erp_lang', lang);
@@ -187,7 +197,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const t = translations[language];
 
-  const actingCompany = session?.actingCompany || null;
   const currency = session?.actingCompany?.currency || session?.company?.currency || 'AED';
 
   const setCurrency = async (newCurrency: string) => {

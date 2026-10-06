@@ -34,8 +34,22 @@ export function exportToXLSX(filename: string, sheets: { name: string; data: Rec
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
 
-export function printElement(elementId?: string): void {
+export function printElement(elementId?: string, documentTitle?: string): void {
   if (typeof window !== 'undefined') {
+    const originalTitle = document.title;
+    if (documentTitle) {
+      document.title = documentTitle;
+    }
+    let restored = false;
+    const restore = () => {
+      if (restored) return;
+      restored = true;
+      if (documentTitle) {
+        document.title = originalTitle;
+      }
+    };
+    window.addEventListener('afterprint', restore, { once: true });
     window.print();
+    setTimeout(restore, 120000);
   }
 }

@@ -26,6 +26,7 @@ import { printElement } from '@/lib/export';
 import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString } from '@/lib/date-utils';
+import { CustomerStatementModal } from '@/components/common/CustomerStatementModal';
 
 export function CustomersScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, currency } = useApp();
@@ -41,10 +42,7 @@ export function CustomersScreen() {
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
   const [pendingJobsCustomer, setPendingJobsCustomer] = useState<Customer | null>(null);
   const [constraintModalJob, setConstraintModalJob] = useState<Job | null>(null);
-  const [statementData, setStatementData] = useState<{
-    customer: Customer;
-    items: Array<{ date: string; description: string; debit: number; credit: number; balance: number }>;
-  } | null>(null);
+  const [statementCustomerId, setStatementCustomerId] = useState<string | null>(null);
 
   // Form states
   const [newName, setNewName] = useState('');
@@ -153,10 +151,7 @@ export function CustomersScreen() {
   };
 
   const openStatement = (customerId: string) => {
-    const stmt = dataProvider.getCustomerStatement(customerId);
-    if (stmt) {
-      setStatementData(stmt);
-    }
+    setStatementCustomerId(customerId);
   };
 
   const handleMarkJobPaid = async (jobId: string) => {
@@ -275,9 +270,22 @@ export function CustomersScreen() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="font-bold text-base text-slate-900 dark:text-white">{cust.name}</h3>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      <span>{cust.mobile || 'No mobile recorded'}</span>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                      {cust.mobile ? (
+                        <a
+                          href={`tel:${cust.mobile}`}
+                          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium hover:text-blue-700 transition"
+                          title="Call customer"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span>{cust.mobile}</span>
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1 text-slate-400 italic">
+                          <Phone className="w-3 h-3" />
+                          <span>No mobile recorded</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -597,101 +605,18 @@ export function CustomersScreen() {
         </div>
       )}
 
-      {/* Customer Statement Modal (Printable ledger) */}
-      {statementData && (
-        <div className="fixed inset-0 z-50 bg-black/70 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            id="printable-statement"
-            className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto printable-card"
-          >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-slate-800 no-print">
-              <div>
-                <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">{t.customers.statementTitle}</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {statementData.customer.name} · {statementData.customer.mobile || 'No phone'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => printElement('printable-statement')}
-                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition allow-print"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  {t.customers.printStatement}
-                </button>
-                <button
-                  onClick={() => setStatementData(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Statement Header (Appears in print) */}
-            <div className="space-y-2">
-              <div className="text-sm font-bold text-slate-900 dark:text-slate-200">
-                Customer: <span className="text-blue-600 dark:text-blue-400">{statementData.customer.name}</span>
-              </div>
-              <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
-                <span>Credit Limit: {statementData.customer.credit_limit.toFixed(2)}</span>
-                <span className="font-bold text-sm text-slate-900 dark:text-white">
-                  Current Balance: {statementData.customer.current_balance?.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {/* Statement Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left rtl:text-right">
-                <thead className="bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="py-2.5 px-3">{t.common.date}</th>
-                    <th className="py-2.5 px-3">Description</th>
-                    <th className="py-2.5 px-3 text-right rtl:text-left">{t.customers.debit}</th>
-                    <th className="py-2.5 px-3 text-right rtl:text-left">{t.customers.creditCol}</th>
-                    <th className="py-2.5 px-3 text-right rtl:text-left">{t.customers.runningBalance}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {statementData.items.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-slate-500">
-                        No transactions recorded for this customer yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    statementData.items.map((it, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">{it.date}</td>
-                        <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200">{it.description}</td>
-                        <td className="py-2.5 px-3 text-right rtl:text-left text-slate-700 dark:text-slate-300">
-                          {it.debit > 0 ? it.debit.toFixed(2) : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 text-right rtl:text-left text-emerald-600 dark:text-emerald-400 font-medium">
-                          {it.credit > 0 ? it.credit.toFixed(2) : '-'}
-                        </td>
-                        <td className="py-2.5 px-3 text-right rtl:text-left font-bold text-slate-900 dark:text-white">
-                          {it.balance.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end no-print">
-              <button
-                onClick={() => setStatementData(null)}
-                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-200 dark:border-slate-700"
-              >
-                {t.customers.close}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Customer Statement Modal (Professional Printable & WhatsApp Ledger) */}
+      {statementCustomerId && (
+        <CustomerStatementModal
+          customerId={statementCustomerId}
+          company={session?.company || null}
+          currency={currency}
+          onClose={() => setStatementCustomerId(null)}
+          onRecordPayment={(cust) => {
+            setStatementCustomerId(null);
+            setPaymentCustomer(cust);
+          }}
+        />
       )}
 
       {/* Customer Pending Vehicles Settlement Modal */}

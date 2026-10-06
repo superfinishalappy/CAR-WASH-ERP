@@ -274,7 +274,7 @@ export function Header() {
                 <span>{todayStr}</span>
               </span>
               <span className="text-slate-300 dark:text-slate-700">·</span>
-              <span>{company?.name || 'Garage ERP'}</span>
+              <span>{company?.name || 'Super Finish'}</span>
             </div>
           </div>
         </div>

@@ -110,23 +110,49 @@ button, a, input, select {
 
 /* Print Specific Rules */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 6mm 8mm;
+  }
+  body, html {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .no-print,
   nav,
   header,
   aside,
-  button:not(.allow-print) {
+  button,
+  .no-print * {
     display: none !important;
   }
   .print-only {
     display: block !important;
   }
-  .printable-card {
-    border: 1px solid #ddd !important;
+  #unified-invoice-document,
+  #unified-statement-document {
+    width: 100% !important;
+    max-width: 760px !important;
+    margin: 0 auto !important;
+    padding: 16px 20px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
     box-shadow: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .printable-card {
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     page-break-inside: avoid;
   }
 }
