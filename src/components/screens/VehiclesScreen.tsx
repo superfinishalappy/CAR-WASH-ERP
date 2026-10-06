@@ -32,6 +32,7 @@ import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString, getYesterdayString } from '@/lib/date-utils';
 import { ProfessionalInvoiceModal } from '@/components/common/ProfessionalInvoiceModal';
 import { supabase } from '@/lib/supabase';
+import Tesseract from 'tesseract.js';
 
 export function VehiclesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, setActiveTab, currency } = useApp();
@@ -398,50 +399,32 @@ export function VehiclesScreen() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    let apiKey = localStorage.getItem('platerecognizer_api_key');
-    if (!apiKey) {
-      const promptKey = window.prompt('Please enter your PlateRecognizer API Key (get it from platerecognizer.com). It will be saved securely on this device:');
-      if (!promptKey) return;
-      apiKey = promptKey.trim();
-      localStorage.setItem('platerecognizer_api_key', apiKey);
-    }
-
     setIsScanningPlate(true);
-    showToast('Scanning plate... please wait.', 'info');
+    showToast('Scanning plate... this may take a moment.', 'info');
 
     try {
-      const formData = new FormData();
-      // Compress slightly to save bandwidth, but not too much to preserve OCR quality
-      const compressed = await compressImage(file);
-      formData.append('upload', compressed);
-
-      const response = await fetch('https://api.platerecognizer.com/v1/plate-reader/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${apiKey}`
-        },
-        body: formData
-      });
-
-      const data = await response.json();
+      // Free client-side OCR using Tesseract.js
+      const { data: { text } } = await Tesseract.recognize(
+        file,
+        'eng',
+        { logger: m => console.log(m) }
+      );
       
-      if (response.ok && data.results && data.results.length > 0) {
-        const detectedPlate = data.results[0].plate.toUpperCase();
-        setPlate(detectedPlate);
-        showToast(`Plate detected: ${detectedPlate}`, 'success');
-      } else {
-        if (data.detail) {
-             showToast(`API Error: ${data.detail}`, 'error');
-             if(typeof data.detail === 'string' && data.detail.includes("Invalid token")) {
-                 localStorage.removeItem('platerecognizer_api_key');
-             }
+      if (text && text.trim().length > 0) {
+        // Clean up the text: remove non-alphanumeric characters and make uppercase
+        const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        if (cleanText) {
+          setPlate(cleanText);
+          showToast(`Plate detected: ${cleanText}`, 'success');
         } else {
-             showToast('No plate found in the image. Please try a closer/clearer photo.', 'error');
+          showToast('Could not find any clear letters or numbers on the plate.', 'error');
         }
+      } else {
+        showToast('No plate found in the image. Please try a closer/clearer photo.', 'error');
       }
     } catch (err: any) {
       console.error(err);
-      showToast('Network error while scanning plate.', 'error');
+      showToast('Error while scanning plate.', 'error');
     } finally {
       setIsScanningPlate(false);
       e.target.value = '';
