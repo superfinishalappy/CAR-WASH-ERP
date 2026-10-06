@@ -1356,6 +1356,7 @@ export class DataProvider {
       is_paid?: boolean;
       customer_id?: string | null;
       entry_date?: string;
+      photo_url?: string;
     }
   ): { success: boolean; job?: Job; error?: string } {
     const job = this.jobs.find((j) => j.id === id);
@@ -1387,6 +1388,9 @@ export class DataProvider {
     job.total = price + extra;
     job.customer_id = data.customer_id || null;
     job.is_paid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
+    if (data.photo_url !== undefined) {
+      job.photo_url = data.photo_url;
+    }
 
     // Point-in-Time Lock Guarantee:
     // If the staff member didn't change, strictly preserve the locked commission_rate from that moment!
@@ -1430,6 +1434,7 @@ export class DataProvider {
         customer_id: job.customer_id,
         is_paid: job.is_paid,
         entry_date: job.entry_date,
+        photo_url: job.photo_url,
       }).eq('id', id).then(({ error }) => {
         if (error) console.error('Supabase job update error:', error.message);
       });
