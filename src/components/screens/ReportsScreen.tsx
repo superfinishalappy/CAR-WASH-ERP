@@ -102,9 +102,8 @@ export function ReportsScreen() {
     }
   };
 
-  const role = session?.profile.role || 'staff';
   // Manager has "both": Data entry + reports!
-  const canViewReports = ['superadmin', 'superstaff', 'owner', 'manager', 'accountant'].includes(role);
+  const canViewReports = ['superadmin', 'superstaff', 'senior_staff', 'owner', 'manager', 'accountant'].includes(role);
 
   const fetchReport = () => {
     if (!canViewReports) {
