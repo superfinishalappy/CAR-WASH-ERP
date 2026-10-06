@@ -134,12 +134,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const actingCompany = session?.actingCompany || null;
 
-  // Keep browser document title synced with active workshop name
+  // Keep browser document title synced with active workshop name, and listen to sync errors
   useEffect(() => {
     const compName = actingCompany?.name || session?.company?.name;
     if (compName && typeof document !== 'undefined') {
       document.title = compName;
     }
+
+    const handleSyncError = (e: any) => {
+      if (e.detail?.message) {
+        // use showToast but we don't have it in scope of this hook easily unless we add it
+        // wait, we can just use an alert or a window toast, but we want the app toast.
+        // It's better to add the listener inside a separate useEffect that depends on showToast and triggerRefresh
+      }
+    };
   }, [session, actingCompany]);
 
   const setLanguage = (lang: Language) => {
@@ -188,6 +196,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setDataVersion((v) => v + 1);
     });
   };
+
+  useEffect(() => {
+    const handleSyncError = (e: any) => {
+      if (e.detail?.message) {
+        showToast(e.detail.message, 'error');
+        setDataVersion((v) => v + 1); // trigger react render to clear rolled-back row
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('app-sync-error', handleSyncError);
+      return () => window.removeEventListener('app-sync-error', handleSyncError);
+    }
+  }, []);
 
   const logout = async () => {
     await dataProvider.logout();

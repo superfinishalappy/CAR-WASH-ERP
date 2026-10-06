@@ -75,6 +75,12 @@ export class DataProvider {
     }
   }
 
+  private dispatchSyncError(message: string) {
+    if (isBrowser()) {
+      window.dispatchEvent(new CustomEvent('app-sync-error', { detail: { message } }));
+    }
+  }
+
   public async init(): Promise<void> {
     if (this.isInitialized) return;
     this.isInitialized = true;
@@ -1332,11 +1338,17 @@ export class DataProvider {
         staff_id: job.staff_id,
         price: job.price,
         extra_amount: job.extra_amount,
+        commission_rate: job.commission_rate,
+        commission_amount: job.commission_amount,
         customer_id: job.customer_id,
         is_paid: job.is_paid,
         created_by: job.created_by,
       }).then(({ error }) => {
-        if (error) console.error('Supabase job insert error:', error.message);
+        if (error) {
+          console.error('Supabase job insert error:', error.message);
+          this.jobs = this.jobs.filter((j) => j.id !== job.id);
+          this.dispatchSyncError(`Failed to save job (Sync Error): ${error.message}`);
+        }
       });
     }
 
@@ -1431,12 +1443,18 @@ export class DataProvider {
         staff_id: job.staff_id,
         price: job.price,
         extra_amount: job.extra_amount,
+        commission_rate: job.commission_rate,
+        commission_amount: job.commission_amount,
         customer_id: job.customer_id,
         is_paid: job.is_paid,
         entry_date: job.entry_date,
         photo_url: job.photo_url,
       }).eq('id', id).then(({ error }) => {
-        if (error) console.error('Supabase job update error:', error.message);
+        if (error) {
+          console.error('Supabase job update error:', error.message);
+          Object.assign(job, old);
+          this.dispatchSyncError(`Failed to update job (Sync Error): ${error.message}`);
+        }
       });
     }
 
@@ -1562,7 +1580,13 @@ export class DataProvider {
     this.logAudit('jobs', id, 'DELETE', old, null);
 
     if (supabase) {
-      supabase.from('jobs').delete().eq('id', id).then(() => {});
+      supabase.from('jobs').delete().eq('id', id).then(({ error }) => {
+        if (error) {
+          console.error('Supabase job delete error:', error.message);
+          this.jobs.splice(idx, 0, old);
+          this.dispatchSyncError(`Failed to delete job (Sync Error): ${error.message}`);
+        }
+      });
     }
 
     return { success: true };
