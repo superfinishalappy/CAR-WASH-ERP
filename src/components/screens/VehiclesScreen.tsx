@@ -31,6 +31,7 @@ import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString, getYesterdayString } from '@/lib/date-utils';
 import { ProfessionalInvoiceModal } from '@/components/common/ProfessionalInvoiceModal';
+import { supabase } from '@/lib/supabase';
 
 export function VehiclesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, setActiveTab, currency } = useApp();
@@ -273,7 +274,8 @@ export function VehiclesScreen() {
       });
 
       if (res.success) {
-        const entryId = res.id; // assume addJob returns the new record id
+        // const entryId = res.id; // assume addJob returns the new record id
+        const entryId = res.job?.id ?? '';
         // ---- Photo upload ----
         if (photoFile) {
           const filePath = `vehicle-photos/${entryId}.webp`;
@@ -717,6 +719,22 @@ export function VehiclesScreen() {
                 placeholder={`Optional extra (${currency})`}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-blue-500"
               />
+{/* Vehicle Photo Capture */}
+<div className="mt-2">
+  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.vehicles.photo || 'Vehicle Photo'}</label>
+  {photoPreview ? (
+    <div className="relative mt-1">
+      <img src={photoPreview} alt="Vehicle preview" className="h-20 w-20 object-cover rounded-md border" />
+      <button type="button" onClick={removePhoto} className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow">
+        <X className="w-3 h-3 text-red-600" />
+      </button>
+    </div>
+  ) : (
+    <div className="mt-1">
+      <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900 file:text-blue-700 hover:file:bg-blue-100 dark:hover:file:bg-blue-800" />
+    </div>
+  )}
+</div>
             </div>
           </div>
 
