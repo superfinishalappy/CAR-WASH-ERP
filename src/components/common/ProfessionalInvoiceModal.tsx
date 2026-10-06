@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Job, Company } from '@/types/database';
 import { dataProvider } from '@/lib/data-provider';
 import {
@@ -10,10 +10,11 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  Send,
+  Share2,
+  Loader2,
 } from 'lucide-react';
 import { UnifiedDocumentLayout, UnifiedDocumentItem } from './UnifiedDocumentLayout';
-import { printDocumentElement } from '@/lib/pdf-generator';
+import { printDocumentElement, captureDocumentImage } from '@/lib/pdf-generator';
 
 interface ProfessionalInvoiceModalProps {
   job: Job | null;
@@ -31,6 +32,9 @@ export function ProfessionalInvoiceModal({
   onTogglePayment,
 }: ProfessionalInvoiceModalProps) {
   const [copied, setCopied] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareToast, setShareToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const cachedFileRef = useRef<File | null>(null);
 
   // Resolve customer account if attached to a registered customer
   const customer = job?.customer_id
@@ -82,14 +86,72 @@ Thank you for choosing ${companyName}!`
     printDocumentElement('unified-invoice-document', docTitle);
   };
 
-  // WhatsApp click handler
-  const handleWhatsApp = () => {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const message = generateWhatsAppMessage();
-    const url = cleanPhone
-      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+  // Pre-generate invoice image in background as soon as modal mounts,
+  // guaranteeing navigator.share({ files: [file] }) executes in 0ms synchronously within active user gesture!
+  useEffect(() => {
+    let active = true;
+    const prepare = async () => {
+      await new Promise((r) => setTimeout(r, 120));
+      if (!active) return;
+      try {
+        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
+        if (captured && active) {
+          cachedFileRef.current = captured.file;
+        }
+      } catch (err) {
+        console.warn('Pre-rendering image failed:', err);
+      }
+    };
+    prepare();
+    return () => {
+      active = false;
+    };
+  }, [docTitle]);
+
+  // Native Image Sharing handler — invokes Windows / Android / iOS OS native share sheet
+  const handleShareImage = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    setShareToast(null);
+
+    try {
+      let fileToShare = cachedFileRef.current;
+      if (!fileToShare) {
+        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
+        if (captured) {
+          fileToShare = captured.file;
+          cachedFileRef.current = captured.file;
+        }
+      }
+
+      if (!fileToShare) {
+        throw new Error('Could not generate invoice image');
+      }
+
+      // Check native share support for files (Windows 10/11, Android, iOS)
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+        await navigator.share({
+          files: [fileToShare],
+        });
+      } else {
+        setShareToast({
+          message: 'Native share is not supported on this browser.',
+          type: 'error',
+        });
+        setTimeout(() => setShareToast(null), 4000);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.warn('Share image error:', err);
+        setShareToast({
+          message: 'Could not open share. Please try again.',
+          type: 'error',
+        });
+        setTimeout(() => setShareToast(null), 4000);
+      }
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const handleCopyText = () => {
@@ -150,15 +212,28 @@ Thank you for choosing ${companyName}!`
             </div>
           </div>
 
-          {/* Right: WhatsApp, Print, and Close buttons */}
+          {/* Right: Share Image, Print, and Close buttons */}
           <div className="flex items-center gap-2">
+            {shareToast && (
+              <span className="hidden sm:inline-block text-xs font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 animate-in fade-in">
+                {shareToast.message}
+              </span>
+            )}
+
+            {/* Native Share Image Button: Triggers OS native share sheet (Android/iOS) with image preview */}
             <button
               type="button"
-              onClick={handleWhatsApp}
-              className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95"
+              onClick={handleShareImage}
+              disabled={isSharing}
+              className="py-2 px-3.5 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95 disabled:opacity-75 disabled:pointer-events-none"
+              title="Share invoice image via Android / iOS Native Share"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
+              {isSharing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5" />
+              )}
+              <span>{isSharing ? 'Preparing...' : 'Share Image'}</span>
             </button>
 
             <button

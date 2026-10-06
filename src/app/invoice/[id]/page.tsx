@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { dataProvider } from '@/lib/data-provider';
 import { Job, Company } from '@/types/database';
 import { UnifiedDocumentLayout, UnifiedDocumentItem } from '@/components/common/UnifiedDocumentLayout';
-import { printDocumentElement, downloadPdfFromElement } from '@/lib/pdf-generator';
-import { Printer, Download, Car, ArrowLeft } from 'lucide-react';
+import { printDocumentElement, downloadPdfFromElement, captureDocumentImage } from '@/lib/pdf-generator';
+import { Printer, Download, Car, ArrowLeft, Share2, Loader2 } from 'lucide-react';
 
 export default function PublicInvoicePage() {
   const params = useParams();
@@ -84,6 +84,74 @@ export default function PublicInvoicePage() {
   const companyName = company?.name || 'Super Finish';
   const docTitle = `${companyName} ${invoiceNumber}`;
 
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareToast, setShareToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const cachedFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const prepare = async () => {
+      await new Promise((r) => setTimeout(r, 120));
+      if (!active) return;
+      try {
+        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
+        if (captured && active) {
+          cachedFileRef.current = captured.file;
+        }
+      } catch (err) {
+        console.warn('Pre-rendering invoice image failed:', err);
+      }
+    };
+    prepare();
+    return () => {
+      active = false;
+    };
+  }, [docTitle]);
+
+  const handleShareImage = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    setShareToast(null);
+
+    try {
+      let fileToShare = cachedFileRef.current;
+      if (!fileToShare) {
+        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
+        if (captured) {
+          fileToShare = captured.file;
+          cachedFileRef.current = captured.file;
+        }
+      }
+
+      if (!fileToShare) {
+        throw new Error('Could not generate invoice image');
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+        await navigator.share({
+          files: [fileToShare],
+        });
+      } else {
+        setShareToast({
+          message: 'Native share is not supported on this browser.',
+          type: 'error',
+        });
+        setTimeout(() => setShareToast(null), 4000);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.warn('Share image error:', err);
+        setShareToast({
+          message: 'Could not open share. Please try again.',
+          type: 'error',
+        });
+        setTimeout(() => setShareToast(null), 4000);
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
     document.title = docTitle;
@@ -97,6 +165,28 @@ export default function PublicInvoicePage() {
           Official Digital Invoice · {invoiceNumber}
         </span>
         <div className="flex items-center gap-2">
+          {shareToast && (
+            <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 animate-in fade-in">
+              {shareToast.message}
+            </span>
+          )}
+
+          {/* Native Share Image Button */}
+          <button
+            type="button"
+            onClick={handleShareImage}
+            disabled={isSharing}
+            className="py-1.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition active:scale-95 disabled:opacity-75 disabled:pointer-events-none"
+            title="Share invoice image via Android / iOS Native Share"
+          >
+            {isSharing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Share2 className="w-3.5 h-3.5" />
+            )}
+            <span>{isSharing ? 'Preparing...' : 'Share Image'}</span>
+          </button>
+
           <button
             onClick={() => downloadPdfFromElement('unified-invoice-document', `${docTitle}.pdf`)}
             className="py-1.5 px-3.5 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm hover:bg-slate-800 transition"
