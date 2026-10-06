@@ -493,44 +493,46 @@ export function VehiclesScreen() {
       </div>
 
       {/* Summary KPI Badges - Total Revenue, Base Amount, and Extra Amount */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.count}</div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{count}</div>
-        </div>
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.totalRevenue}</div>
-          <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
-            {totalRev.toFixed(2)} <span className="text-xs font-semibold text-slate-400">{currency}</span>
+      {(isOwner || isManager) && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.count}</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{count}</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.totalRevenue}</div>
+            <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+              {totalRev.toFixed(2)} <span className="text-xs font-semibold text-slate-400">{currency}</span>
+            </div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/80 dark:border-indigo-800/40 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-indigo-700 dark:text-indigo-400 font-medium">Base Amount</div>
+            <div className="text-xl font-black text-indigo-900 dark:text-indigo-200 mt-1">
+              {totalBase.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+            </div>
+            <div className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">Base Service Value</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-amber-700 dark:text-amber-400 font-medium">Extra Amount</div>
+            <div className="text-xl font-black text-amber-900 dark:text-amber-200 mt-1">
+              {totalExtra.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+            </div>
+            <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Add-on & Polish Value</div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{t.vehicles.paid}</div>
+            <div className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
+              {paidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+            </div>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
+            <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
+              {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+            </div>
           </div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200/80 dark:border-indigo-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-indigo-700 dark:text-indigo-400 font-medium">Base Amount</div>
-          <div className="text-xl font-black text-indigo-900 dark:text-indigo-200 mt-1">
-            {totalBase.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-          </div>
-          <div className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">Base Service Value</div>
-        </div>
-        <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-amber-700 dark:text-amber-400 font-medium">Extra Amount</div>
-          <div className="text-xl font-black text-amber-900 dark:text-amber-200 mt-1">
-            {totalExtra.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-          </div>
-          <div className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Add-on & Polish Value</div>
-        </div>
-        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">{t.vehicles.paid}</div>
-          <div className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
-            {paidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-          </div>
-        </div>
-        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
-          <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
-            {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Fast Cashier Entry Form Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">

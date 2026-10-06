@@ -56,6 +56,7 @@ export function SalesHistoryScreen() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Pagination (50 items per page)
   const [currentPage, setCurrentPage] = useState(1);
@@ -766,11 +767,24 @@ export function SalesHistoryScreen() {
 
                         {/* 2. Plate & Vehicle */}
                         <td className="py-3 px-4">
-                          <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md inline-block border border-slate-200 dark:border-slate-700">
-                            {job.plate || 'NO PLATE'}
-                          </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            {job.vehicle_type}
+                          <div className="flex items-center gap-2">
+                            {job.photo_url && (
+                              <img 
+                                src={job.photo_url} 
+                                alt="Vehicle" 
+                                className="w-8 h-8 rounded-md object-cover border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm hover:opacity-80 transition"
+                                onClick={() => setSelectedPhoto(job.photo_url!)}
+                                title="Show Vehicle"
+                              />
+                            )}
+                            <div>
+                              <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md inline-block border border-slate-200 dark:border-slate-700">
+                                {job.plate || 'NO PLATE'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                {job.vehicle_type}
+                              </div>
+                            </div>
                           </div>
                         </td>
 
@@ -939,6 +953,15 @@ export function SalesHistoryScreen() {
                     <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
+                          {job.photo_url && (
+                            <img 
+                              src={job.photo_url} 
+                              alt="Vehicle" 
+                              className="w-10 h-10 rounded-md object-cover border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm hover:opacity-80 transition"
+                              onClick={() => setSelectedPhoto(job.photo_url!)}
+                              title="Show Vehicle"
+                            />
+                          )}
                           <span className="font-mono font-black text-sm px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 tracking-wider shadow-sm">
                             {job.plate || 'NO PLATE'}
                           </span>
@@ -1275,7 +1298,17 @@ export function SalesHistoryScreen() {
             : undefined
         }
       />
-
+      {/* Photo enlarge modal */}
+      {selectedPhoto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedPhoto(null)}>
+          <div className="max-w-[90vw] max-h-[80vh] bg-white dark:bg-slate-900 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+            <button className="absolute top-2 right-2 text-slate-500 hover:text-slate-800" onClick={() => setSelectedPhoto(null)}>
+              <X className="w-5 h-5" />
+            </button>
+            <img src={selectedPhoto} alt="Vehicle enlarged" className="max-w-full max-h-full object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
