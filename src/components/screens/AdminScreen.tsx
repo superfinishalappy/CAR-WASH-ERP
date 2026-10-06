@@ -761,6 +761,7 @@ export function AdminScreen() {
                   <option value="owner">Owner (Full Garage & Financial Access)</option>
                   <option value="manager">Manager (Operations, Jobs & Expenses)</option>
                   <option value="accountant">Accountant (Customers, Invoices & Reports)</option>
+                  <option value="senior_staff">Super Staff (Team & Sales History)</option>
                   <option value="staff">Staff / Technician</option>
                 </select>
               </div>

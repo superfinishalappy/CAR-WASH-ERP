@@ -700,6 +700,7 @@ export function TeamScreen() {
                     <option value="owner">Owner (Full Garage & Financial Access)</option>
                     <option value="manager">Manager (Operations, Jobs & Expenses)</option>
                     <option value="accountant">Accountant</option>
+                    <option value="senior_staff">Super Staff (Team & Sales History)</option>
                     <option value="staff">Staff (Data Entry Only)</option>
                   </select>
                 </div>
