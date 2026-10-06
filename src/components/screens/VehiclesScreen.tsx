@@ -292,7 +292,15 @@ export function VehiclesScreen() {
               const { data: { publicUrl } } = supabase.storage.from('vehicle-photos').getPublicUrl(filePath);
               if (res.job) {
                 await dataProvider.updateJob(entryId, { 
-                  ...res.job, 
+                  work_type: res.job.work_type,
+                  vehicle_type: res.job.vehicle_type,
+                  staff_id: res.job.staff_id,
+                  price: res.job.price,
+                  plate: res.job.plate || undefined,
+                  mobile: res.job.mobile || undefined,
+                  extra_amount: res.job.extra_amount,
+                  customer_id: res.job.customer_id,
+                  is_paid: res.job.is_paid,
                   photo_url: publicUrl 
                 });
               }
