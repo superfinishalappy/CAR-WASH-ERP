@@ -24,7 +24,7 @@ export function Navigation() {
   const role = session.profile.role;
   const isPlatform = ['superadmin', 'superstaff'].includes(role);
   const canReports = ['superadmin', 'superstaff', 'owner', 'manager', 'accountant'].includes(role);
-  const canTeam = ['superadmin', 'superstaff', 'owner', 'manager'].includes(role);
+  const canTeam = ['superadmin', 'superstaff', 'owner', 'manager', 'senior_staff'].includes(role);
 
   interface NavItem {
     id: NavTab;

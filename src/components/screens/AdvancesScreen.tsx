@@ -33,7 +33,7 @@ export function AdvancesScreen() {
   const [note, setNote] = useState('');
 
   const role = session?.profile.role || 'staff';
-  const isOwner = role === 'owner' || ['superadmin', 'superstaff'].includes(role);
+  const isOwner = role === 'owner' || ['superadmin', 'superstaff', 'senior_staff'].includes(role);
   const canDeleteRole = isOwner || ['manager', 'accountant'].includes(role);
 
   useEffect(() => {

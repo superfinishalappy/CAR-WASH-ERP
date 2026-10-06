@@ -72,6 +72,7 @@ export function SalesHistoryScreen() {
   const isPlatform = ['superadmin', 'superstaff'].includes(role);
   const isOwner = role === 'owner' || isPlatform;
   const isManager = role === 'manager';
+  const isSeniorStaff = role === 'senior_staff';
 
   // Load complete jobs history
   useEffect(() => {
@@ -401,7 +402,7 @@ export function SalesHistoryScreen() {
       {/* Top Summary KPI Cards - Total Revenue, Base Amount, Extra Amount, Paid, Unpaid, Avg */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Filtered Sales */}
-        <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span>Total Sales</span>
             <Receipt className="w-4 h-4 text-blue-500" />
@@ -413,7 +414,7 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-slate-500 mt-1 font-semibold">
             {metrics.totalCount} orders
           </div>
-        </div>
+        </div>)}
 
         {/* Base Amount */}
         {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 shadow-sm backdrop-blur-md">
@@ -446,7 +447,7 @@ export function SalesHistoryScreen() {
         </div>)}
 
         {/* Total Paid Sales */}
-        <div className="p-4 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
             <span>Collected / Paid</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -458,10 +459,10 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-semibold">
             {metrics.paidCount} paid
           </div>
-        </div>
+        </div>)}
 
         {/* Total Unpaid / Credit Due */}
-        <div className="p-4 rounded-3xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
+        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-rose-700 dark:text-rose-400 font-medium">
             <span>Unpaid / Due</span>
             <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
@@ -473,7 +474,7 @@ export function SalesHistoryScreen() {
           <div className="text-xs text-rose-700 dark:text-rose-400 mt-1 font-semibold">
             {metrics.unpaidCount} unpaid/credit
           </div>
-        </div>
+        </div>)}
 
         {/* Average Job Value */}
         {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
@@ -548,7 +549,7 @@ export function SalesHistoryScreen() {
                             { id: 'today', label: 'Today' },
               { id: 'yesterday', label: 'Yesterday' },
               { id: 'week', label: 'Last 7 Days' },
-              ...(isOwner || isManager ? [{ id: 'month', label: 'This Month' }, { id: 'custom', label: 'Custom Range' }] : []),
+              ...(isOwner || isManager || isSeniorStaff ? [{ id: 'month', label: 'This Month' }, { id: 'custom', label: 'Custom Range' }] : []),
             ].map((d) => (
               <button
                 key={d.id}

@@ -79,7 +79,7 @@ export function Sidebar() {
   const role = session.profile.role;
   const isPlatform = ['superadmin', 'superstaff'].includes(role);
   const canReports = ['superadmin', 'superstaff', 'owner', 'manager', 'accountant'].includes(role);
-  const canTeam = ['superadmin', 'superstaff', 'owner', 'manager'].includes(role);
+  const canTeam = ['superadmin', 'superstaff', 'owner', 'manager', 'senior_staff'].includes(role);
   const company = isPlatform ? actingCompany : session.company;
 
   const todayStr = getTodayString(company?.timezone);

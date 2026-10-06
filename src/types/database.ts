@@ -1,6 +1,6 @@
 // Types for Garage ERP (Postgres + Supabase Schema)
 
-export type AppRole = 'superadmin' | 'superstaff' | 'owner' | 'manager' | 'accountant' | 'staff';
+export type AppRole = 'superadmin' | 'superstaff' | 'owner' | 'manager' | 'accountant' | 'senior_staff' | 'staff';
 export type PayType = 'none' | 'commission' | 'daily' | 'monthly';
 export type AttStatus = 'present' | 'leave';
 

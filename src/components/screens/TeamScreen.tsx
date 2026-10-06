@@ -74,7 +74,7 @@ export function TeamScreen() {
   const [expGrowthBad, setExpGrowthBad] = useState(20);
 
   const role = session?.profile.role || 'staff';
-  const isOwner = role === 'owner' || ['superadmin', 'superstaff'].includes(role);
+  const isOwner = role === 'owner' || ['superadmin', 'superstaff', 'senior_staff'].includes(role);
 
   useEffect(() => {
     const p = dataProvider.getCompanyProfiles();
