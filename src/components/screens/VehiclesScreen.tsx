@@ -399,41 +399,50 @@ export function VehiclesScreen() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    let apiKey = localStorage.getItem('platerecognizer_api_key');
+    if (!apiKey) {
+      const promptKey = window.prompt('Please enter your PlateRecognizer API Key (get it from platerecognizer.com). It will be saved securely on this device:');
+      if (!promptKey) return;
+      apiKey = promptKey.trim();
+      localStorage.setItem('platerecognizer_api_key', apiKey);
+    }
+
     setIsScanningPlate(true);
-    showToast('Scanning plate via Free OCR API... please wait.', 'info');
+    showToast('Scanning plate... please wait.', 'info');
 
     try {
-      const compressed = await compressImage(file);
-      
       const formData = new FormData();
-      formData.append('file', compressed);
-      formData.append('apikey', 'helloworld'); // Free public test key
-      formData.append('language', 'eng');
-      formData.append('OCREngine', '2'); // Engine 2 is much better at reading license plates/numbers
+      // Compress slightly to save bandwidth, but not too much to preserve OCR quality
+      const compressed = await compressImage(file);
+      formData.append('upload', compressed);
 
-      const response = await fetch('https://api.ocr.space/parse/image', {
+      const response = await fetch('https://api.platerecognizer.com/v1/plate-reader/', {
         method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`
+        },
         body: formData
       });
 
       const data = await response.json();
       
-      if (response.ok && !data.IsErroredOnProcessing && data.ParsedResults && data.ParsedResults.length > 0) {
-        const text = data.ParsedResults[0].ParsedText;
-        const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        
-        if (cleanText) {
-          setPlate(cleanText);
-          showToast(`Plate detected: ${cleanText}`, 'success');
-        } else {
-          showToast('Could not find any clear letters or numbers on the plate.', 'error');
-        }
+      if (response.ok && data.results && data.results.length > 0) {
+        const detectedPlate = data.results[0].plate.toUpperCase();
+        setPlate(detectedPlate);
+        showToast(`Plate detected: ${detectedPlate}`, 'success');
       } else {
-        showToast('No plate found in the image. Please take a very close, clear photo.', 'error');
+        if (data.detail) {
+             showToast(`API Error: ${data.detail}`, 'error');
+             if(typeof data.detail === 'string' && data.detail.includes("Invalid token")) {
+                 localStorage.removeItem('platerecognizer_api_key');
+             }
+        } else {
+             showToast('No plate found in the image. Please try a closer/clearer photo.', 'error');
+        }
       }
     } catch (err: any) {
       console.error(err);
-      showToast('Error while scanning plate. Make sure you are connected to the internet.', 'error');
+      showToast('Network error while scanning plate.', 'error');
     } finally {
       setIsScanningPlate(false);
       e.target.value = '';
