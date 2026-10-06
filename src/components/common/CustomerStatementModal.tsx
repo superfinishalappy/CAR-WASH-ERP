@@ -20,11 +20,9 @@ import {
   Share2,
   Loader2,
 } from 'lucide-react';
-import { UnifiedDocumentLayout, UnifiedDocumentItem } from './UnifiedDocumentLayout';
-import {
-  printDocumentElement,
-  captureDocumentImage,
-} from '@/lib/pdf-generator';
+import { UnifiedDocumentLayout, UnifiedDocumentItem, UnifiedDocumentProps } from './UnifiedDocumentLayout';
+import { printDocumentElement } from '@/lib/pdf-generator';
+import { renderDocumentToCanvasFile } from '@/lib/canvas-invoice-renderer';
 import { getTodayString } from '@/lib/date-utils';
 
 interface CustomerStatementModalProps {
@@ -187,19 +185,38 @@ Thank you for your business!`
   const [shareToast, setShareToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const cachedFileRef = useRef<File | null>(null);
 
-  // Pre-generate statement image in background as soon as modal mounts / filters change
+  const statementDocProps: UnifiedDocumentProps = {
+    id: 'unified-statement-document',
+    type: 'statement',
+    company,
+    currency,
+    documentNumber: statementDocNumber,
+    documentDate: getTodayString(company?.timezone),
+    periodLabel: dateRangeLabel,
+    status: shownDueTotal > 0 ? 'UNPAID' : 'PAID',
+    customerName: customer.name,
+    customerMobile: phone,
+    customerAccountId: customer.id.slice(0, 8),
+    creditLimit: customer.credit_limit,
+    items: filteredItems,
+    openingBalance: opening_balance,
+    grandTotal: shownInvoiceTotal,
+    totalPaid: shownPaidTotal,
+    outstandingDue: shownDueTotal,
+    notes: `Showing ${filteredItems.length} records. Filter: ${statusFilter.toUpperCase()}${customer.current_balance ? ` · Total Customer Debt: ${customer.current_balance.toFixed(2)} ${currency}` : ''}`,
+  };
+
+  // Instant Canvas 2D background pre-generation (<8ms)
   useEffect(() => {
     let active = true;
     const prepare = async () => {
-      await new Promise((r) => setTimeout(r, 150));
-      if (!active) return;
       try {
-        const captured = await captureDocumentImage('unified-statement-document', `${docTitle}.png`);
-        if (captured && active) {
-          cachedFileRef.current = captured.file;
+        const file = await renderDocumentToCanvasFile(statementDocProps, `${docTitle}.png`);
+        if (active) {
+          cachedFileRef.current = file;
         }
       } catch (err) {
-        console.warn('Pre-rendering statement image failed:', err);
+        console.warn('Canvas statement pre-render error:', err);
       }
     };
     prepare();
@@ -208,25 +225,15 @@ Thank you for your business!`
     };
   }, [docTitle, filteredItems]);
 
-  // Native Image Sharing: Dispatches document image to mobile/desktop OS native share sheet
+  // Ultra-Fast Native Image Sharing (iPhone, Android, Windows):
   const handleShareImage = async () => {
     if (isSharing) return;
     setIsSharing(true);
     setShareToast(null);
 
     try {
-      let fileToShare = cachedFileRef.current;
-      if (!fileToShare) {
-        const captured = await captureDocumentImage('unified-statement-document', `${docTitle}.png`);
-        if (captured) {
-          fileToShare = captured.file;
-          cachedFileRef.current = captured.file;
-        }
-      }
-
-      if (!fileToShare) {
-        throw new Error('Could not generate statement image');
-      }
+      const fileToShare = cachedFileRef.current || (await renderDocumentToCanvasFile(statementDocProps, `${docTitle}.png`));
+      cachedFileRef.current = fileToShare;
 
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
         await navigator.share({

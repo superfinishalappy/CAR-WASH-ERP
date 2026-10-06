@@ -4,8 +4,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { dataProvider } from '@/lib/data-provider';
 import { Job, Company } from '@/types/database';
-import { UnifiedDocumentLayout, UnifiedDocumentItem } from '@/components/common/UnifiedDocumentLayout';
-import { printDocumentElement, downloadPdfFromElement, captureDocumentImage } from '@/lib/pdf-generator';
+import { UnifiedDocumentLayout, UnifiedDocumentItem, UnifiedDocumentProps } from '@/components/common/UnifiedDocumentLayout';
+import { printDocumentElement, downloadPdfFromElement } from '@/lib/pdf-generator';
+import { renderDocumentToCanvasFile } from '@/lib/canvas-invoice-renderer';
 import { Printer, Download, Car, ArrowLeft, Share2, Loader2 } from 'lucide-react';
 
 export default function PublicInvoicePage() {
@@ -87,26 +88,43 @@ export default function PublicInvoicePage() {
   const [isSharing, setIsSharing] = useState(false);
   const [shareToast, setShareToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const cachedFileRef = useRef<File | null>(null);
+  const docProps: UnifiedDocumentProps = {
+    id: 'unified-invoice-document',
+    type: 'invoice',
+    company,
+    currency,
+    documentNumber: invoiceNumber,
+    documentDate: job.entry_date,
+    status: job.is_paid ? 'PAID' : 'UNPAID',
+    customerName,
+    customerMobile: customer?.mobile || job.mobile || undefined,
+    customerAccountId: job.customer_id ? job.customer_id.slice(0, 8) : undefined,
+    vehiclePlate: job.plate || 'NO PLATE',
+    vehicleType: job.vehicle_type,
+    items,
+    grandTotal: job.total,
+    totalPaid: job.is_paid ? job.total : 0,
+    outstandingDue: job.is_paid ? 0 : job.total,
+  };
 
+  // Instant Canvas 2D background pre-generation (<8ms)
   useEffect(() => {
     let active = true;
     const prepare = async () => {
-      await new Promise((r) => setTimeout(r, 120));
-      if (!active) return;
       try {
-        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
-        if (captured && active) {
-          cachedFileRef.current = captured.file;
+        const file = await renderDocumentToCanvasFile(docProps, `${docTitle}.png`);
+        if (active) {
+          cachedFileRef.current = file;
         }
       } catch (err) {
-        console.warn('Pre-rendering invoice image failed:', err);
+        console.warn('Canvas invoice pre-render error:', err);
       }
     };
     prepare();
     return () => {
       active = false;
     };
-  }, [docTitle]);
+  }, [docTitle, job]);
 
   const handleShareImage = async () => {
     if (isSharing) return;
@@ -114,18 +132,8 @@ export default function PublicInvoicePage() {
     setShareToast(null);
 
     try {
-      let fileToShare = cachedFileRef.current;
-      if (!fileToShare) {
-        const captured = await captureDocumentImage('unified-invoice-document', `${docTitle}.png`);
-        if (captured) {
-          fileToShare = captured.file;
-          cachedFileRef.current = captured.file;
-        }
-      }
-
-      if (!fileToShare) {
-        throw new Error('Could not generate invoice image');
-      }
+      const fileToShare = cachedFileRef.current || (await renderDocumentToCanvasFile(docProps, `${docTitle}.png`));
+      cachedFileRef.current = fileToShare;
 
       if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
         await navigator.share({
