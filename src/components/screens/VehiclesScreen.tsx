@@ -62,6 +62,7 @@ export function VehiclesScreen() {
   const [customerId, setCustomerId] = useState<string>('');
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isScanningPlate, setIsScanningPlate] = useState(false);
   // Photo handling state
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -393,6 +394,60 @@ export function VehiclesScreen() {
     });
   };
 
+  const handleScanPlate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    let apiKey = localStorage.getItem('platerecognizer_api_key');
+    if (!apiKey) {
+      const promptKey = window.prompt('Please enter your PlateRecognizer API Key (get it from platerecognizer.com). It will be saved securely on this device:');
+      if (!promptKey) return;
+      apiKey = promptKey.trim();
+      localStorage.setItem('platerecognizer_api_key', apiKey);
+    }
+
+    setIsScanningPlate(true);
+    showToast('Scanning plate... please wait.', 'info');
+
+    try {
+      const formData = new FormData();
+      // Compress slightly to save bandwidth, but not too much to preserve OCR quality
+      const compressed = await compressImage(file);
+      formData.append('upload', compressed);
+
+      const response = await fetch('https://api.platerecognizer.com/v1/plate-reader/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${apiKey}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.results && data.results.length > 0) {
+        const detectedPlate = data.results[0].plate.toUpperCase();
+        setPlate(detectedPlate);
+        showToast(`Plate detected: ${detectedPlate}`, 'success');
+      } else {
+        if (data.detail) {
+             showToast(`API Error: ${data.detail}`, 'error');
+             if(typeof data.detail === 'string' && data.detail.includes("Invalid token")) {
+                 localStorage.removeItem('platerecognizer_api_key');
+             }
+        } else {
+             showToast('No plate found in the image. Please try a closer/clearer photo.', 'error');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast('Network error while scanning plate.', 'error');
+    } finally {
+      setIsScanningPlate(false);
+      e.target.value = '';
+    }
+  };
+
 
   const handleUpdateJob = (e: React.FormEvent) => {
     e.preventDefault();
@@ -617,7 +672,20 @@ export function VehiclesScreen() {
 
             {/* Plate Number */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.vehicles.plate}</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.vehicles.plate}</label>
+                <label className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:hover:bg-indigo-900 dark:text-indigo-300 px-2 py-0.5 rounded cursor-pointer font-bold transition flex items-center gap-1 shadow-sm border border-indigo-200 dark:border-indigo-800/50">
+                  {isScanningPlate ? (
+                    <span className="animate-pulse flex items-center gap-1"><Camera className="w-3 h-3" /> Scanning...</span>
+                  ) : (
+                    <>
+                      <Camera className="w-3 h-3" />
+                      Scan Plate
+                      <input type="file" accept="image/*" capture="environment" onChange={handleScanPlate} className="hidden" disabled={isScanningPlate} />
+                    </>
+                  )}
+                </label>
+              </div>
               <div className="relative">
                 <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                 <input
