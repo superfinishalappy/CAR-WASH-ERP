@@ -25,6 +25,7 @@ import {
   CalendarCheck,
   Receipt,
   Printer,
+  Camera,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
@@ -60,6 +61,12 @@ export function VehiclesScreen() {
   const [customerId, setCustomerId] = useState<string>('');
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
+  // Photo handling state
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  // Modal state for enlarged vehicle image preview
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Edit / Delete / Invoice Modal State
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -238,7 +245,7 @@ export function VehiclesScreen() {
 
   const paginatedJobs = filteredJobs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const handleAddJob = (e: React.FormEvent) => {
+  const handleAddJob = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!canAddSelectedDate) {
@@ -252,7 +259,7 @@ export function VehiclesScreen() {
     }
 
     try {
-      const res = dataProvider.addJob({
+      const res = await dataProvider.addJob({
         entry_date: selectedDate,
         plate,
         mobile,
@@ -266,6 +273,20 @@ export function VehiclesScreen() {
       });
 
       if (res.success) {
+        const entryId = res.id; // assume addJob returns the new record id
+        // ---- Photo upload ----
+        if (photoFile) {
+          const filePath = `vehicle-photos/${entryId}.webp`;
+          const { error: uploadErr } = await supabase.storage
+            .from('vehicle-photos')
+            .upload(filePath, photoFile, { upsert: true });
+          if (uploadErr) {
+            showToast('Vehicle saved but photo upload failed: ' + uploadErr.message, 'error');
+          } else {
+            const publicUrl = supabase.storage.from('vehicle-photos').getPublicUrl(filePath).publicURL;
+            await dataProvider.updateJob(entryId, { photo_url: publicUrl });
+          }
+        }
         showToast('Vehicle order recorded successfully!', 'success');
         // Reset entry form
         setPlate('');
@@ -274,6 +295,8 @@ export function VehiclesScreen() {
         setExtraAmount('');
         setCustomerId('');
         setIsPaid(false);
+        setPhotoFile(null);
+        setPhotoPreview(null);
         triggerRefresh();
       } else {
         showToast(res.error || 'Failed to record vehicle', 'error');
@@ -283,6 +306,73 @@ export function VehiclesScreen() {
       showToast(err?.message || 'Failed to record vehicle', 'error');
     }
   };
+
+  // ------------------------------------------------
+  // Photo handling helpers
+  // ------------------------------------------------
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setPhotoFile(compressed);
+    setPhotoPreview(URL.createObjectURL(compressed));
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+  };
+
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        let [w, h] = [img.width, img.height];
+        const maxSide = 480;
+        if (w > h) {
+          if (w > maxSide) {
+            h = Math.round((h * maxSide) / w);
+            w = maxSide;
+          }
+        } else {
+          if (h > maxSide) {
+            w = Math.round((w * maxSide) / h);
+            h = maxSide;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        let quality = 0.45;
+        const minQuality = 0.25;
+        const maxSize = 30 * 1024; // 30KB
+        const attempt = () => {
+          canvas.toBlob(async (blob) => {
+            if (!blob) return reject('Canvas conversion failed');
+            if (blob.size <= maxSize || quality <= minQuality) {
+              const file = new File([blob], `${Date.now()}.webp`, { type: 'image/webp' });
+              resolve(file);
+            } else {
+              quality -= 0.05;
+              if (quality < minQuality) {
+                canvas.width = Math.round(canvas.width * 0.85);
+                canvas.height = Math.round(canvas.height * 0.85);
+                quality = 0.45;
+              }
+              attempt();
+            }
+          }, 'image/webp', quality);
+        };
+        attempt();
+      };
+      img.onerror = (e) => reject(e);
+      img.src = url;
+    });
+  };
+
 
   const handleUpdateJob = (e: React.FormEvent) => {
     e.preventDefault();
@@ -728,6 +818,17 @@ export function VehiclesScreen() {
             </button>
           </div>
         </form>
+        {/* Photo enlarge modal */}
+        {selectedPhoto && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelectedPhoto(null)}>
+            <div className="max-w-[90vw] max-h-[80vh] bg-white dark:bg-slate-900 rounded-xl p-4" onClick={(e) => e.stopPropagation()}>
+              <button className="absolute top-2 right-2 text-slate-500 hover:text-slate-800" onClick={() => setSelectedPhoto(null)}>
+                <X className="w-5 h-5" />
+              </button>
+              <img src={selectedPhoto} alt="Vehicle enlarged" className="max-w-full max-h-full object-contain" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Selected Day's Vehicles List Table */}
