@@ -278,15 +278,25 @@ export function VehiclesScreen() {
         const entryId = res.job?.id ?? '';
         // ---- Photo upload ----
         if (photoFile) {
-          const filePath = `vehicle-photos/${entryId}.webp`;
-          const { error: uploadErr } = await supabase.storage
-            .from('vehicle-photos')
-            .upload(filePath, photoFile, { upsert: true });
-          if (uploadErr) {
-            showToast('Vehicle saved but photo upload failed: ' + uploadErr.message, 'error');
+          if (!supabase) {
+            showToast('Vehicle saved but photo upload failed: Supabase not configured', 'error');
           } else {
-            const publicUrl = supabase.storage.from('vehicle-photos').getPublicUrl(filePath).publicURL;
-            await dataProvider.updateJob(entryId, { photo_url: publicUrl });
+            const filePath = `vehicle-photos/${entryId}.webp`;
+            const { error: uploadErr } = await supabase.storage
+              .from('vehicle-photos')
+              .upload(filePath, photoFile, { upsert: true });
+            if (uploadErr) {
+              showToast('Vehicle saved but photo upload failed: ' + uploadErr.message, 'error');
+            } else {
+              // getPublicUrl returns { data: { publicUrl: string } }
+              const { data: { publicUrl } } = supabase.storage.from('vehicle-photos').getPublicUrl(filePath);
+              if (res.job) {
+                await dataProvider.updateJob(entryId, { 
+                  ...res.job, 
+                  photo_url: publicUrl 
+                });
+              }
+            }
           }
         }
         showToast('Vehicle order recorded successfully!', 'success');
@@ -721,7 +731,7 @@ export function VehiclesScreen() {
               />
 {/* Vehicle Photo Capture */}
 <div className="space-y-1">
-  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t.vehicles.photo || 'Vehicle Photo'}</label>
+  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">{(t.vehicles as any).photo || 'Vehicle Photo'}</label>
   {photoPreview ? (
     <div className="relative mt-1 inline-block">
       <img src={photoPreview} alt="Vehicle preview" className="h-24 w-24 object-cover rounded-xl border-2 border-slate-200 shadow-sm" />
@@ -937,7 +947,7 @@ export function VehiclesScreen() {
                                 src={job.photo_url} 
                                 alt="Vehicle" 
                                 className="w-8 h-8 rounded-md object-cover border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm hover:opacity-80 transition"
-                                onClick={() => setSelectedPhoto(job.photo_url)}
+                                onClick={() => setSelectedPhoto(job.photo_url || null)}
                                 title="Show Vehicle"
                               />
                             )}
@@ -1075,7 +1085,7 @@ export function VehiclesScreen() {
                             src={job.photo_url} 
                             alt="Vehicle" 
                             className="w-10 h-10 rounded-md object-cover border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm hover:opacity-80 transition"
-                            onClick={() => setSelectedPhoto(job.photo_url)}
+                            onClick={() => setSelectedPhoto(job.photo_url || null)}
                             title="Show Vehicle"
                           />
                         )}
