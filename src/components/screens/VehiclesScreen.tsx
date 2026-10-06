@@ -281,7 +281,7 @@ export function VehiclesScreen() {
           if (!supabase) {
             showToast('Vehicle saved but photo upload failed: Supabase not configured', 'error');
           } else {
-            const filePath = `vehicle-photos/${entryId}.webp`;
+            const filePath = `vehicle-photos/${entryId}.jpg`;
             const { error: uploadErr } = await supabase.storage
               .from('vehicle-photos')
               .upload(filePath, photoFile, { upsert: true });
@@ -366,25 +366,25 @@ export function VehiclesScreen() {
         canvas.height = h;
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0, w, h);
-        let quality = 0.45;
+        let quality = 0.50;
         const minQuality = 0.25;
-        const maxSize = 30 * 1024; // 30KB
+        const maxSize = 40 * 1024; // 40KB for JPEG to be safe
         const attempt = () => {
           canvas.toBlob(async (blob) => {
             if (!blob) return reject('Canvas conversion failed');
             if (blob.size <= maxSize || quality <= minQuality) {
-              const file = new File([blob], `${Date.now()}.webp`, { type: 'image/webp' });
+              const file = new File([blob], `${Date.now()}.jpg`, { type: 'image/jpeg' });
               resolve(file);
             } else {
               quality -= 0.05;
               if (quality < minQuality) {
                 canvas.width = Math.round(canvas.width * 0.85);
                 canvas.height = Math.round(canvas.height * 0.85);
-                quality = 0.45;
+                quality = 0.50;
               }
               attempt();
             }
-          }, 'image/webp', quality);
+          }, 'image/jpeg', quality);
         };
         attempt();
       };
