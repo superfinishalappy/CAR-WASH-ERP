@@ -400,19 +400,28 @@ export function VehiclesScreen() {
     if (!file) return;
 
     setIsScanningPlate(true);
-    showToast('Scanning plate... this may take a moment.', 'info');
+    showToast('Scanning plate via Free OCR API... please wait.', 'info');
 
     try {
-      // Free client-side OCR using Tesseract.js
-      const { data: { text } } = await Tesseract.recognize(
-        file,
-        'eng',
-        { logger: m => console.log(m) }
-      );
+      const compressed = await compressImage(file);
       
-      if (text && text.trim().length > 0) {
-        // Clean up the text: remove non-alphanumeric characters and make uppercase
+      const formData = new FormData();
+      formData.append('file', compressed);
+      formData.append('apikey', 'helloworld'); // Free public test key
+      formData.append('language', 'eng');
+      formData.append('OCREngine', '2'); // Engine 2 is much better at reading license plates/numbers
+
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && !data.IsErroredOnProcessing && data.ParsedResults && data.ParsedResults.length > 0) {
+        const text = data.ParsedResults[0].ParsedText;
         const cleanText = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        
         if (cleanText) {
           setPlate(cleanText);
           showToast(`Plate detected: ${cleanText}`, 'success');
@@ -420,11 +429,11 @@ export function VehiclesScreen() {
           showToast('Could not find any clear letters or numbers on the plate.', 'error');
         }
       } else {
-        showToast('No plate found in the image. Please try a closer/clearer photo.', 'error');
+        showToast('No plate found in the image. Please take a very close, clear photo.', 'error');
       }
     } catch (err: any) {
       console.error(err);
-      showToast('Error while scanning plate.', 'error');
+      showToast('Error while scanning plate. Make sure you are connected to the internet.', 'error');
     } finally {
       setIsScanningPlate(false);
       e.target.value = '';
