@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
 import { Expense } from '@/types/database';
@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
-import { getTodayString } from '@/lib/date-utils';
+import { getTodayString, getFirstDayOfMonthString } from '@/lib/date-utils';
 
 export function ExpensesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, currency } = useApp();
@@ -29,6 +29,12 @@ export function ExpensesScreen() {
   const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
+
+  // Filter States
+  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'this_month' | 'all' | 'custom'>('this_month');
+  const [customStartDate, setCustomStartDate] = useState(todayStr);
+  const [customEndDate, setCustomEndDate] = useState(todayStr);
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   // Form State
   const [category, setCategory] = useState('');
@@ -43,7 +49,8 @@ export function ExpensesScreen() {
   const canDeleteRole = isOwner || ['manager', 'accountant'].includes(role);
 
   useEffect(() => {
-    const list = dataProvider.getExpenses(selectedDate);
+    // Get ALL expenses, no longer constrained to selectedDate for the view
+    const list = dataProvider.getExpenses();
     setExpenses(list);
 
     const s = dataProvider.getSettings();
@@ -51,14 +58,43 @@ export function ExpensesScreen() {
     if (!category && s.expense_categories.length > 0) {
       setCategory(s.expense_categories[0]);
     }
-  }, [selectedDate, dataVersion]);
+  }, [dataVersion]);
 
-  // Reset page when date changes
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedDate]);
+  }, [datePreset, customStartDate, customEndDate, categoryFilter]);
 
-  const paginatedExpenses = expenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const getDateRange = () => {
+    const tz = session?.company?.timezone;
+    if (datePreset === 'today') return { start: todayStr, end: todayStr };
+    if (datePreset === 'yesterday') {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: tz || 'Asia/Dubai' }));
+      d.setDate(d.getDate() - 1);
+      const yStr = d.toISOString().split('T')[0];
+      return { start: yStr, end: yStr };
+    }
+    if (datePreset === 'this_month') {
+      return { start: getFirstDayOfMonthString(undefined, tz), end: todayStr };
+    }
+    if (datePreset === 'custom' && customStartDate && customEndDate) {
+      return { start: customStartDate, end: customEndDate };
+    }
+    return null; // All time
+  };
+
+  const filteredExpenses = useMemo(() => {
+    const dateRange = getDateRange();
+    return expenses.filter((e) => {
+      if (categoryFilter !== 'all' && e.category !== categoryFilter) return false;
+      if (dateRange) {
+        if (e.entry_date < dateRange.start || e.entry_date > dateRange.end) return false;
+      }
+      return true;
+    });
+  }, [expenses, datePreset, customStartDate, customEndDate, categoryFilter, session]);
+
+  const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const canAddSelectedDate = isOwner || selectedDate === todayStr;
 
@@ -116,7 +152,7 @@ export function ExpensesScreen() {
     }
   };
 
-  const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpense = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -219,16 +255,63 @@ export function ExpensesScreen() {
         </form>
       </div>
 
+      {/* Filter Bar */}
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm backdrop-blur-md">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5" /> Date Preset
+            </label>
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="this_month">This Month</option>
+              <option value="all">All Time</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+          {datePreset === 'custom' && (
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Range</label>
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+                <span className="text-slate-400">to</span>
+                <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+              </div>
+            </div>
+          )}
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5" /> Category Filter
+            </label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Expenses Table */}
       <div className="rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl transition-colors">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="font-bold text-sm text-slate-900 dark:text-white">Expenses for {selectedDate}</div>
+          <div className="font-bold text-sm text-slate-900 dark:text-white">Filtered Expenses ({filteredExpenses.length})</div>
           <div className="text-sm font-black text-rose-600 dark:text-rose-400">
             {t.expenses.totalExpenses}: {totalExpense.toFixed(2)} {currency}
           </div>
         </div>
 
-        {expenses.length === 0 ? (
+        {filteredExpenses.length === 0 ? (
           <div className="p-10 text-center text-slate-500 text-sm">
             {t.expenses.noExpenses}
           </div>

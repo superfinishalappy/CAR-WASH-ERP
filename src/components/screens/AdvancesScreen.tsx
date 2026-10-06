@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
 import { Advance, Profile } from '@/types/database';
@@ -13,9 +13,10 @@ import {
   User,
   Info,
   Clock,
+  Filter,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
-import { getTodayString } from '@/lib/date-utils';
+import { getTodayString, getFirstDayOfMonthString } from '@/lib/date-utils';
 
 export function AdvancesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, currency } = useApp();
@@ -26,6 +27,12 @@ export function AdvancesScreen() {
   const [staffList, setStaffList] = useState<Profile[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
+
+  // Filter States
+  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'this_month' | 'all' | 'custom'>('this_month');
+  const [customStartDate, setCustomStartDate] = useState(todayStr);
+  const [customEndDate, setCustomEndDate] = useState(todayStr);
+  const [staffFilter, setStaffFilter] = useState('all');
 
   // Form State
   const [staffId, setStaffId] = useState('');
@@ -45,7 +52,41 @@ export function AdvancesScreen() {
     if (!staffId && s.length > 0) setStaffId(s[0].id);
   }, [dataVersion]);
 
-  const paginatedAdvances = advances.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [datePreset, customStartDate, customEndDate, staffFilter]);
+
+  const getDateRange = () => {
+    const tz = session?.company?.timezone;
+    if (datePreset === 'today') return { start: todayStr, end: todayStr };
+    if (datePreset === 'yesterday') {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: tz || 'Asia/Dubai' }));
+      d.setDate(d.getDate() - 1);
+      const yStr = d.toISOString().split('T')[0];
+      return { start: yStr, end: yStr };
+    }
+    if (datePreset === 'this_month') {
+      return { start: getFirstDayOfMonthString(undefined, tz), end: todayStr };
+    }
+    if (datePreset === 'custom' && customStartDate && customEndDate) {
+      return { start: customStartDate, end: customEndDate };
+    }
+    return null; // All time
+  };
+
+  const filteredAdvances = useMemo(() => {
+    const dateRange = getDateRange();
+    return advances.filter((a) => {
+      if (staffFilter !== 'all' && a.staff_id !== staffFilter) return false;
+      if (dateRange) {
+        if (a.entry_date < dateRange.start || a.entry_date > dateRange.end) return false;
+      }
+      return true;
+    });
+  }, [advances, datePreset, customStartDate, customEndDate, staffFilter, session]);
+
+  const paginatedAdvances = filteredAdvances.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const canAddSelectedDate = isOwner || selectedDate === todayStr;
 
@@ -97,7 +138,7 @@ export function AdvancesScreen() {
     }
   };
 
-  const totalAdvance = advances.reduce((sum, a) => sum + a.amount, 0);
+  const totalAdvance = filteredAdvances.reduce((sum, a) => sum + a.amount, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -199,10 +240,57 @@ export function AdvancesScreen() {
         </form>
       </div>
 
+      {/* Filter Bar */}
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm backdrop-blur-md">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5" /> Date Preset
+            </label>
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="this_month">This Month</option>
+              <option value="all">All Time</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+          {datePreset === 'custom' && (
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Range</label>
+              <div className="flex items-center gap-2">
+                <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+                <span className="text-slate-400">to</span>
+                <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+              </div>
+            </div>
+          )}
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> Staff Filter
+            </label>
+            <select
+              value={staffFilter}
+              onChange={(e) => setStaffFilter(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+            >
+              <option value="all">All Staff</option>
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>{s.full_name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Advances Table */}
       <div className="rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md dark:shadow-xl transition-colors">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="font-bold text-sm text-slate-900 dark:text-white">Disbursed Advances ({advances.length})</div>
+          <div className="font-bold text-sm text-slate-900 dark:text-white">Disbursed Advances ({filteredAdvances.length})</div>
           <div className="text-sm font-black text-amber-600 dark:text-amber-400">
             {t.advances.totalAdvances}: {totalAdvance.toFixed(2)} {currency}
           </div>
