@@ -138,6 +138,8 @@ export interface CompanySettings {
   vehicle_types: string[];
   expense_categories: string[];
   thresholds: Thresholds;
+  monthly_rent?: number;
+  monthly_fixed_costs?: number;
 }
 
 export interface AuditLogEntry {
@@ -239,8 +241,16 @@ export interface ReportData {
     mobile: string | null;
     credit_limit: number;
     current_balance: number;
+    current_balance: number;
     status: 'ok' | 'near_limit' | 'over_limit';
   }>;
+  fixed_costs: {
+    monthly_rent: number;
+    monthly_other: number;
+    period_fixed_cost: number;
+    period_variable_cost: number;
+    period_total_cost: number;
+  };
 }
 
 export interface UserSession {
@@ -254,4 +264,27 @@ export interface UserSession {
   company: Company | null;
   actingCompanyId?: string | null;
   actingCompany?: Company | null;
+}
+
+export interface InventoryItem {
+  id: string;
+  company_id: string;
+  name: string;
+  unit: string;
+  current_stock: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryLog {
+  id: string;
+  company_id: string;
+  item_id: string;
+  action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off';
+  quantity: number;
+  entry_date: string;
+  note: string | null;
+  created_by?: string;
+  created_at?: string;
+  item_name?: string; // For joins
 }

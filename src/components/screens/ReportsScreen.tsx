@@ -393,6 +393,57 @@ export function ReportsScreen() {
       {/* KPI Cards Grid (12 Core Metrics: Revenue Breakdown, Clean OPEX, Payroll, Profits, Health) */}
       {!isSeniorStaff && (
         <>
+          {/* Break-Even CFO Widget */}
+          <div className="mb-6 p-6 rounded-3xl bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 shadow-xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+              <TrendingUp className="w-32 h-32 text-white" />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-4 flex-1">
+                <div>
+                  <h2 className="text-lg font-black text-white flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    CFO Break-Even Target
+                  </h2>
+                  <p className="text-xs text-slate-400">Tracking revenue against amortized fixed costs and variable expenses for the selected period.</p>
+                </div>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wide">Target Cost</div>
+                    <div className="text-xl font-bold text-rose-400">{report.fixed_costs.period_total_cost.toFixed(2)} {currency}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wide">Actual Revenue</div>
+                    <div className="text-xl font-bold text-emerald-400">{report.kpis.revenue.toFixed(2)} {currency}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wide">Amortized Fixed</div>
+                    <div className="text-sm font-bold text-slate-300">{report.fixed_costs.period_fixed_cost.toFixed(2)} {currency}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wide">Variable (Salaries/OpEx)</div>
+                    <div className="text-sm font-bold text-slate-300">{report.fixed_costs.period_variable_cost.toFixed(2)} {currency}</div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="pt-2">
+                  <div className="flex justify-between text-xs font-bold text-white mb-2">
+                    <span>{report.kpis.revenue >= report.fixed_costs.period_total_cost ? 'IN PROFIT 🚀' : 'COVERING COSTS...'}</span>
+                    <span>{Math.min(100, (report.kpis.revenue / (report.fixed_costs.period_total_cost || 1)) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-1000 ${report.kpis.revenue >= report.fixed_costs.period_total_cost ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      style={{ width: `${Math.min(100, (report.kpis.revenue / (report.fixed_costs.period_total_cost || 1)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* 1. Vehicles Count */}
         <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">

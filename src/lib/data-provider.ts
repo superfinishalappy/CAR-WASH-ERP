@@ -2073,6 +2073,8 @@ export class DataProvider {
         vehicle_types: updated.vehicle_types,
         expense_categories: updated.expense_categories,
         thresholds: updated.thresholds,
+        monthly_fixed_costs: updated.monthly_fixed_costs,
+        monthly_rent: updated.monthly_rent,
       }).then(() => {});
     }
 
@@ -2595,6 +2597,14 @@ export class DataProvider {
       status: (c.status || 'ok') as 'ok' | 'near_limit' | 'over_limit',
     }));
 
+    const daysDiff = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)) + 1);
+    const monthlyRent = settings.monthly_rent || 0;
+    const monthlyOther = settings.monthly_fixed_costs || 0;
+    
+    const periodFixedCost = ((monthlyRent + monthlyOther) / 30) * daysDiff;
+    const periodVariableCost = operatingExpenses + totalSalary;
+    const periodTotalCost = periodFixedCost + periodVariableCost;
+
     return {
       kpis: {
         vehicles_count: totalVehicles,
@@ -2635,6 +2645,13 @@ export class DataProvider {
       sales_by_vehicle_type: salesByVehicleType,
       unpaid_vehicles: unpaidVehicles,
       customer_accounts: customerAccounts,
+      fixed_costs: {
+        monthly_rent: monthlyRent,
+        monthly_other: monthlyOther,
+        period_fixed_cost: periodFixedCost,
+        period_variable_cost: periodVariableCost,
+        period_total_cost: periodTotalCost,
+      }
     };
   }
 

@@ -72,6 +72,10 @@ export function TeamScreen() {
   const [salesDropWarn, setSalesDropWarn] = useState(-10);
   const [salesDropBad, setSalesDropBad] = useState(-25);
   const [expGrowthBad, setExpGrowthBad] = useState(20);
+  
+  // Fixed Costs
+  const [monthlyRent, setMonthlyRent] = useState(0);
+  const [monthlyFixedCosts, setMonthlyFixedCosts] = useState(0);
 
   const role = session?.profile.role || 'staff';
   const isOwner = role === 'owner' || ['superadmin', 'superstaff', 'senior_staff'].includes(role);
@@ -98,6 +102,9 @@ export function TeamScreen() {
     setSalesDropWarn(th.sales_drop_warn * 100);
     setSalesDropBad(th.sales_drop_bad * 100);
     setExpGrowthBad(th.expense_growth * 100);
+    
+    setMonthlyRent(s.monthly_rent || 0);
+    setMonthlyFixedCosts(s.monthly_fixed_costs || 0);
 
     const logs = dataProvider.getAuditLogs();
     setAuditLogs(logs);
@@ -233,6 +240,8 @@ export function TeamScreen() {
         sales_drop_bad: salesDropBad / 100,
         expense_growth: expGrowthBad / 100,
       },
+      monthly_rent: monthlyRent,
+      monthly_fixed_costs: monthlyFixedCosts,
     });
 
     if (res.success) {
@@ -587,10 +596,37 @@ export function TeamScreen() {
               </div>
             </div>
 
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-3 uppercase tracking-wider">Fixed Monthly Costs (Break-Even Widget)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Monthly Rent ({portalCurrency})</span>
+                  <input
+                    type="number"
+                    value={monthlyRent}
+                    onChange={(e) => setMonthlyRent(Number(e.target.value))}
+                    className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                  />
+                  <span className="text-[10px] text-slate-500">Used to calculate daily break-even target.</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Other Fixed Costs ({portalCurrency})</span>
+                  <input
+                    type="number"
+                    value={monthlyFixedCosts}
+                    onChange={(e) => setMonthlyFixedCosts(Number(e.target.value))}
+                    className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                  />
+                  <span className="text-[10px] text-slate-500">Internet, software, etc.</span>
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end pt-3">
               <button
                 type="submit"
                 className="py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition"
+
               >
                 {t.team.saveSettings}
               </button>
