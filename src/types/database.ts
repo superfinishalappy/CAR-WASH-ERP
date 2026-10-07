@@ -241,7 +241,6 @@ export interface ReportData {
     mobile: string | null;
     credit_limit: number;
     current_balance: number;
-    current_balance: number;
     status: 'ok' | 'near_limit' | 'over_limit';
   }>;
   fixed_costs: {
