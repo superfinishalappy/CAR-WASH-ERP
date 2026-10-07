@@ -13,6 +13,8 @@ import {
   UserSession,
   DiagnosticWarning,
   AppRole,
+  InventoryItem,
+  InventoryLog,
 } from '@/types/database';
 import { supabase, buildSyntheticEmail } from '@/lib/supabase';
 import {
@@ -64,6 +66,10 @@ export class DataProvider {
   private customerPayments: CustomerPayment[] = [];
   private settings: Record<string, CompanySettings> = {};
   private auditLog: AuditLogEntry[] = [];
+  
+  // Phase 2: Inventory
+  private inventoryItems: InventoryItem[] = [];
+  private inventoryLogs: InventoryLog[] = [];
   private currentSession: UserSession | null = null;
   private isInitialized = false;
 
@@ -2732,6 +2738,172 @@ export class DataProvider {
         net_profit: Math.round(grandProfit * 100) / 100,
       },
     };
+  }
+
+  // ==========================================
+  // INVENTORY METHODS (Phase 2)
+  // ==========================================
+
+  public getInventoryItems(companyId?: string): InventoryItem[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    return this.inventoryItems.filter((i) => i.company_id === cid).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public getInventoryLogs(companyId?: string): InventoryLog[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    
+    // Add item_name for UI joins
+    return this.inventoryLogs
+      .filter((l) => l.company_id === cid)
+      .map(l => ({
+        ...l,
+        item_name: this.inventoryItems.find(i => i.id === l.item_id)?.name || 'Unknown Item'
+      }))
+      .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+  }
+
+  public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number }): Promise<{ success: boolean; error?: string }> {
+    const cid = this.getEffectiveCompanyId();
+    if (!cid) return { success: false, error: 'No active company' };
+
+    const newItem: InventoryItem = {
+      id: crypto.randomUUID(),
+      company_id: cid,
+      name: payload.name,
+      unit: payload.unit,
+      current_stock: payload.current_stock,
+      expected_washes: payload.expected_washes,
+      created_at: new Date().toISOString(),
+    };
+
+    this.inventoryItems.push(newItem);
+    this.logAudit('inventory_items', cid, 'INSERT', null, newItem);
+
+    if (supabase) {
+      const { error } = await supabase.from('inventory_items').insert(newItem);
+      if (error) {
+        // Rollback
+        this.inventoryItems = this.inventoryItems.filter(i => i.id !== newItem.id);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
+  }
+
+  public async updateInventoryItem(id: string, payload: Partial<InventoryItem>): Promise<{ success: boolean; error?: string }> {
+    const idx = this.inventoryItems.findIndex(i => i.id === id);
+    if (idx === -1) return { success: false, error: 'Item not found' };
+
+    const current = this.inventoryItems[idx];
+    const updated = { ...current, ...payload };
+    this.inventoryItems[idx] = updated;
+
+    this.logAudit('inventory_items', current.company_id, 'UPDATE', current, updated);
+
+    if (supabase) {
+      const { error } = await supabase.from('inventory_items').update(payload).eq('id', id);
+      if (error) {
+        this.inventoryItems[idx] = current;
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
+  }
+
+  public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string }): Promise<{ success: boolean; error?: string }> {
+    const cid = this.getEffectiveCompanyId();
+    if (!cid) return { success: false, error: 'No active company' };
+    const username = this.currentSession?.user.username || 'unknown';
+
+    const newLog: InventoryLog = {
+      id: crypto.randomUUID(),
+      company_id: cid,
+      item_id: payload.item_id,
+      action_type: payload.action_type,
+      quantity: payload.quantity,
+      entry_date: getLocalDateString(new Date()),
+      note: payload.note || null,
+      created_by: username,
+      created_at: new Date().toISOString(),
+    };
+
+    // Calculate new stock mathematically based on action
+    const itemIdx = this.inventoryItems.findIndex(i => i.id === payload.item_id);
+    if (itemIdx === -1) return { success: false, error: 'Item not found' };
+    const item = this.inventoryItems[itemIdx];
+    
+    const prevStock = item.current_stock;
+    let newStock = prevStock;
+    
+    if (payload.action_type === 'add_stock') {
+      newStock += payload.quantity;
+    } else if (payload.action_type === 'start_batch' || payload.action_type === 'write_off') {
+      newStock -= payload.quantity;
+    }
+    // 'empty_batch' doesn't deduct stock, it just marks an active batch as finished.
+
+    this.inventoryLogs.unshift(newLog);
+    const updatedItem = { ...item, current_stock: newStock };
+    this.inventoryItems[itemIdx] = updatedItem;
+
+    if (supabase) {
+      const { error: logErr } = await supabase.from('inventory_logs').insert(newLog);
+      if (logErr) {
+        this.inventoryLogs = this.inventoryLogs.filter(l => l.id !== newLog.id);
+        this.inventoryItems[itemIdx] = item; // Rollback stock
+        return { success: false, error: logErr.message };
+      }
+      
+      const { error: itemErr } = await supabase.from('inventory_items').update({ current_stock: newStock }).eq('id', item.id);
+      if (itemErr) console.error("Failed to update item stock on server:", itemErr);
+    }
+    return { success: true };
+  }
+
+  public getActiveBatches(companyId?: string) {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    
+    const items = this.getInventoryItems(cid);
+    const logs = this.getInventoryLogs(cid); // already sorted by date desc
+    const activeBatches = [];
+
+    for (const item of items) {
+      if (!item.expected_washes || item.expected_washes <= 0) continue; // Only process items that are consumables
+
+      // Find the most recent start_batch
+      const itemLogs = logs.filter(l => l.item_id === item.id);
+      const lastStart = itemLogs.find(l => l.action_type === 'start_batch');
+      
+      if (lastStart) {
+        // Did we empty it AFTER we started it?
+        const lastEmpty = itemLogs.find(l => l.action_type === 'empty_batch');
+        const startDate = new Date(lastStart.entry_date).getTime();
+        const emptyDate = lastEmpty ? new Date(lastEmpty.entry_date).getTime() : 0;
+
+        if (startDate > emptyDate || !lastEmpty) {
+          // This batch is currently active in the wash bay!
+          // Calculate vehicles washed since startDate
+          const jobsSince = this.jobs.filter(j => j.company_id === cid && new Date(j.entry_date).getTime() >= startDate);
+          const washedCount = jobsSince.length;
+          
+          const expectedTotal = lastStart.quantity * item.expected_washes;
+          const remainingPct = Math.max(0, 100 - (washedCount / expectedTotal) * 100);
+
+          activeBatches.push({
+            item,
+            startLog: lastStart,
+            washedCount,
+            expectedTotal,
+            remainingPct
+          });
+        }
+      }
+    }
+    
+    return activeBatches;
   }
 }
 

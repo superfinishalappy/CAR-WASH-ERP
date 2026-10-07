@@ -14,6 +14,7 @@ import {
   Building,
   Menu,
   MoreHorizontal,
+  Package,
 } from 'lucide-react';
 
 export function Navigation() {
@@ -57,6 +58,12 @@ export function Navigation() {
       id: 'customers' as NavTab,
       label: t.nav.customers,
       icon: <Users className="w-4 h-4" />,
+      visible: true,
+    },
+    {
+      id: 'inventory' as NavTab,
+      label: 'Inventory',
+      icon: <Package className="w-4 h-4" />,
       visible: true,
     },
     {

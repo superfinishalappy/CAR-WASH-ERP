@@ -5,7 +5,7 @@ import { UserSession, Company } from '@/types/database';
 import { Language, translations } from '@/lib/i18n';
 import { dataProvider } from '@/lib/data-provider';
 
-export type NavTab = 'vehicles' | 'sales' | 'customers' | 'expenses' | 'advances' | 'attendance' | 'team' | 'reports' | 'admin';
+export type NavTab = 'vehicles' | 'sales' | 'customers' | 'expenses' | 'advances' | 'attendance' | 'team' | 'reports' | 'admin' | 'inventory';
 
 interface Toast {
   id: string;

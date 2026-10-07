@@ -16,8 +16,8 @@ import { ExpensesScreen } from '@/components/screens/ExpensesScreen';
 import { AdvancesScreen } from '@/components/screens/AdvancesScreen';
 import { AttendanceScreen } from '@/components/screens/AttendanceScreen';
 import { TeamScreen } from '@/components/screens/TeamScreen';
-import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { AdminScreen } from '@/components/screens/AdminScreen';
+import InventoryScreen from '@/components/screens/InventoryScreen';
 import { getTodayString } from '@/lib/date-utils';
 
 export default function Home() {
@@ -81,6 +81,7 @@ export default function Home() {
           {activeTab === 'team' && <TeamScreen />}
           {activeTab === 'reports' && <ReportsScreen />}
           {activeTab === 'admin' && isPlatform && <AdminScreen />}
+          {activeTab === 'inventory' && <InventoryScreen />}
         </main>
       </div>
     </div>
