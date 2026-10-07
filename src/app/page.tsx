@@ -16,6 +16,7 @@ import { ExpensesScreen } from '@/components/screens/ExpensesScreen';
 import { AdvancesScreen } from '@/components/screens/AdvancesScreen';
 import { AttendanceScreen } from '@/components/screens/AttendanceScreen';
 import { TeamScreen } from '@/components/screens/TeamScreen';
+import { ReportsScreen } from '@/components/screens/ReportsScreen';
 import { AdminScreen } from '@/components/screens/AdminScreen';
 import InventoryScreen from '@/components/screens/InventoryScreen';
 import { getTodayString } from '@/lib/date-utils';
