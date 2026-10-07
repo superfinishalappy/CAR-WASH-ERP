@@ -197,6 +197,26 @@ export class DataProvider {
         this.auditLog = logData;
       }
 
+      // 11. Inventory Items
+      let invItemQuery = supabase.from('inventory_items').select('*');
+      if (!isPlatform && cid) {
+        invItemQuery = invItemQuery.eq('company_id', cid);
+      }
+      const { data: invItemData, error: invItemErr } = await invItemQuery;
+      if (!invItemErr && invItemData) {
+        this.inventoryItems = invItemData;
+      }
+
+      // 12. Inventory Logs
+      let invLogQuery = supabase.from('inventory_logs').select('*').order('created_at', { ascending: false }).limit(1000);
+      if (!isPlatform && cid) {
+        invLogQuery = invLogQuery.eq('company_id', cid);
+      }
+      const { data: invLogData, error: invLogErr } = await invLogQuery;
+      if (!invLogErr && invLogData) {
+        this.inventoryLogs = invLogData;
+      }
+
       // If active session exists, refresh company & profile in session
       if (this.currentSession) {
         const freshProfile = this.profiles.find((p) => p.id === this.currentSession?.profile.id);
@@ -2075,6 +2095,8 @@ export class DataProvider {
         thresholds: updated.thresholds,
         monthly_fixed_costs: updated.monthly_fixed_costs,
         monthly_rent: updated.monthly_rent,
+        weekly_fixed_costs: updated.weekly_fixed_costs,
+        daily_fixed_costs: updated.daily_fixed_costs,
       }).then(() => {});
     }
 
@@ -2223,8 +2245,18 @@ export class DataProvider {
       });
     }
 
-    const netProfit = revenue - operatingExpenses - totalSalary;
-    const cashProfit = collected - operatingExpenses - totalSalary;
+    const daysDiff = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)) + 1);
+    const monthlyRent = settings.monthly_rent || 0;
+    const monthlyOther = settings.monthly_fixed_costs || 0;
+    const weeklyOther = settings.weekly_fixed_costs || 0;
+    const dailyOther = settings.daily_fixed_costs || 0;
+    
+    // Convert all to daily rate, then multiply by days in period
+    const dailyAmortizedFixed = (monthlyRent + monthlyOther) / 30 + (weeklyOther / 7) + dailyOther;
+    const periodFixedCost = dailyAmortizedFixed * daysDiff;
+
+    const netProfit = revenue - operatingExpenses - totalSalary - periodFixedCost;
+    const cashProfit = collected - operatingExpenses - totalSalary - periodFixedCost;
     const netMargin = revenue > 0 ? Math.round((netProfit / revenue) * 10000) / 10000 : 0;
 
     // Previous Period Calculations
@@ -2597,11 +2629,6 @@ export class DataProvider {
       status: (c.status || 'ok') as 'ok' | 'near_limit' | 'over_limit',
     }));
 
-    const daysDiff = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)) + 1);
-    const monthlyRent = settings.monthly_rent || 0;
-    const monthlyOther = settings.monthly_fixed_costs || 0;
-    
-    const periodFixedCost = ((monthlyRent + monthlyOther) / 30) * daysDiff;
     const periodVariableCost = operatingExpenses + totalSalary;
     const periodTotalCost = periodFixedCost + periodVariableCost;
 
@@ -2648,6 +2675,8 @@ export class DataProvider {
       fixed_costs: {
         monthly_rent: monthlyRent,
         monthly_other: monthlyOther,
+        weekly_other: weeklyOther,
+        daily_other: dailyOther,
         period_fixed_cost: periodFixedCost,
         period_variable_cost: periodVariableCost,
         period_total_cost: periodTotalCost,

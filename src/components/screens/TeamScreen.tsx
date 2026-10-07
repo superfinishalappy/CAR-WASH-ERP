@@ -76,6 +76,8 @@ export function TeamScreen() {
   // Fixed Costs
   const [monthlyRent, setMonthlyRent] = useState(0);
   const [monthlyFixedCosts, setMonthlyFixedCosts] = useState(0);
+  const [weeklyFixedCosts, setWeeklyFixedCosts] = useState(0);
+  const [dailyFixedCosts, setDailyFixedCosts] = useState(0);
 
   const role = session?.profile.role || 'staff';
   const isOwner = role === 'owner' || ['superadmin', 'superstaff', 'senior_staff'].includes(role);
@@ -105,6 +107,8 @@ export function TeamScreen() {
     
     setMonthlyRent(s.monthly_rent || 0);
     setMonthlyFixedCosts(s.monthly_fixed_costs || 0);
+    setWeeklyFixedCosts(s.weekly_fixed_costs || 0);
+    setDailyFixedCosts(s.daily_fixed_costs || 0);
 
     const logs = dataProvider.getAuditLogs();
     setAuditLogs(logs);
@@ -242,6 +246,8 @@ export function TeamScreen() {
       },
       monthly_rent: monthlyRent,
       monthly_fixed_costs: monthlyFixedCosts,
+      weekly_fixed_costs: weeklyFixedCosts,
+      daily_fixed_costs: dailyFixedCosts,
     });
 
     if (res.success) {
@@ -597,20 +603,20 @@ export function TeamScreen() {
             </div>
 
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-3 uppercase tracking-wider">Fixed Monthly Costs (Break-Even Widget)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-3 uppercase tracking-wider">Fixed Costs (For Break-Even Target)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">Monthly Rent ({portalCurrency})</span>
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Monthly Rent</span>
                   <input
                     type="number"
                     value={monthlyRent}
                     onChange={(e) => setMonthlyRent(Number(e.target.value))}
                     className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
                   />
-                  <span className="text-[10px] text-slate-500">Used to calculate daily break-even target.</span>
+                  <span className="text-[10px] text-slate-500">Fixed rent per month.</span>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">Other Fixed Costs ({portalCurrency})</span>
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Monthly Costs</span>
                   <input
                     type="number"
                     value={monthlyFixedCosts}
@@ -618,6 +624,26 @@ export function TeamScreen() {
                     className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
                   />
                   <span className="text-[10px] text-slate-500">Internet, software, etc.</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Weekly Costs</span>
+                  <input
+                    type="number"
+                    value={weeklyFixedCosts}
+                    onChange={(e) => setWeeklyFixedCosts(Number(e.target.value))}
+                    className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                  />
+                  <span className="text-[10px] text-slate-500">E.g. weekly cleaners.</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Daily Costs</span>
+                  <input
+                    type="number"
+                    value={dailyFixedCosts}
+                    onChange={(e) => setDailyFixedCosts(Number(e.target.value))}
+                    className="w-full p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                  />
+                  <span className="text-[10px] text-slate-500">E.g. daily municipality fee.</span>
                 </div>
               </div>
             </div>

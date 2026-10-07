@@ -140,6 +140,8 @@ export interface CompanySettings {
   thresholds: Thresholds;
   monthly_rent?: number;
   monthly_fixed_costs?: number;
+  weekly_fixed_costs?: number;
+  daily_fixed_costs?: number;
 }
 
 export interface AuditLogEntry {
@@ -246,6 +248,8 @@ export interface ReportData {
   fixed_costs: {
     monthly_rent: number;
     monthly_other: number;
+    weekly_other: number;
+    daily_other: number;
     period_fixed_cost: number;
     period_variable_cost: number;
     period_total_cost: number;
@@ -271,6 +275,7 @@ export interface InventoryItem {
   name: string;
   unit: string;
   current_stock: number;
+  expected_washes: number;
   created_at?: string;
   updated_at?: string;
 }
