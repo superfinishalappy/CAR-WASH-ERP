@@ -20,6 +20,8 @@ export default function InventoryScreen() {
   const [actionType, setActionType] = useState<'add_stock' | 'start_batch' | 'write_off'>('add_stock');
   const [actionQuantity, setActionQuantity] = useState('1');
   const [actionNote, setActionNote] = useState('');
+  
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
     loadData();
@@ -47,8 +49,29 @@ export default function InventoryScreen() {
     
     setShowAddModal(false);
     setNewItemName('');
+    setNewItemName('');
     setNewItemStock('');
     setNewItemWashes('');
+    loadData();
+  };
+
+  const handleUpdateItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    await dataProvider.updateInventoryItem(editingItem.id, {
+      name: editingItem.name,
+      unit: editingItem.unit,
+      expected_washes: editingItem.expected_washes,
+    });
+    
+    setEditingItem(null);
+    loadData();
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this item?')) return;
+    await dataProvider.deleteInventoryItem(id);
     loadData();
   };
 
@@ -139,45 +162,76 @@ export default function InventoryScreen() {
 
       {/* Tab: Store Room */}
       {activeTab === 'levels' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map(item => (
-            <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{item.name}</h3>
-                  <p className="text-xs font-medium text-slate-500">1 {item.unit} ≈ {item.expected_washes} washes</p>
-                </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-                  item.current_stock > 2 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                  : item.current_stock > 0 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                }`}>
-                  {item.current_stock} {item.unit} left
-                </div>
-              </div>
-
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={() => { setActionItem(item); setActionType('add_stock'); setShowActionModal(true); }}
-                  className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Buy More
-                </button>
-                <button
-                  onClick={() => { setActionItem(item); setActionType('start_batch'); setShowActionModal(true); }}
-                  disabled={item.current_stock <= 0}
-                  className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold rounded-xl hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
-                >
-                  Take to Wash Bay
-                </button>
-              </div>
-            </div>
-          ))}
-          {items.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-500 font-medium">
-              Your store room is empty. Add a new item to get started.
-            </div>
-          )}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <th className="pb-3 font-medium">Item Name</th>
+                  <th className="pb-3 font-medium">Stock Left</th>
+                  <th className="pb-3 font-medium">Expected Washes</th>
+                  <th className="pb-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {items.map(item => (
+                  <tr key={item.id} className="group">
+                    <td className="py-4">
+                      <div className="font-bold text-slate-900 dark:text-white">{item.name}</div>
+                    </td>
+                    <td className="py-4">
+                      <div className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                        item.current_stock > 2 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                        : item.current_stock > 0 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
+                        {item.current_stock} {item.unit}
+                      </div>
+                    </td>
+                    <td className="py-4 text-slate-600 dark:text-slate-400">
+                      1 {item.unit} ≈ {item.expected_washes} washes
+                    </td>
+                    <td className="py-4">
+                      <div className="flex gap-2 justify-end opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setActionItem(item); setActionType('start_batch'); setShowActionModal(true); }}
+                          disabled={item.current_stock <= 0}
+                          className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+                        >
+                          Wash Bay
+                        </button>
+                        <button
+                          onClick={() => { setActionItem(item); setActionType('add_stock'); setShowActionModal(true); }}
+                          className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Buy More
+                        </button>
+                        <button
+                          onClick={() => setEditingItem(item)}
+                          className="px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold rounded-lg hover:bg-amber-200 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 font-medium">
+                      Your store room is empty. Add a new item to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -347,6 +401,38 @@ export default function InventoryScreen() {
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setShowActionModal(false)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>
                   <button type="submit" className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl shadow-sm hover:opacity-90">Confirm Action</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6">Edit Item</h3>
+              
+              <form onSubmit={handleUpdateItem} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
+                  <input type="text" required value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit</label>
+                    <input type="text" required value={editingItem.unit} onChange={e => setEditingItem({...editingItem, unit: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Washes / Unit</label>
+                    <input type="number" required min="0" value={editingItem.expected_washes || 0} onChange={e => setEditingItem({...editingItem, expected_washes: Number(e.target.value)})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-3 pt-4">
+                  <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>
+                  <button type="submit" className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl shadow-sm hover:opacity-90">Save Changes</button>
                 </div>
               </form>
             </div>

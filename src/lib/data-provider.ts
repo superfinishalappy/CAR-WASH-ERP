@@ -2812,6 +2812,26 @@ export class DataProvider {
     return { success: true };
   }
 
+  public async deleteInventoryItem(id: string): Promise<{ success: boolean; error?: string }> {
+    const idx = this.inventoryItems.findIndex(i => i.id === id);
+    if (idx === -1) return { success: false, error: 'Item not found' };
+
+    const item = this.inventoryItems[idx];
+    this.inventoryItems = this.inventoryItems.filter(i => i.id !== id);
+
+    this.logAudit('inventory_items', item.company_id, 'DELETE', item, null);
+
+    if (supabase) {
+      const { error } = await supabase.from('inventory_items').delete().eq('id', id);
+      if (error) {
+        // Rollback
+        this.inventoryItems.splice(idx, 0, item);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
+  }
+
   public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string }): Promise<{ success: boolean; error?: string }> {
     const cid = this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'No active company' };
@@ -2880,13 +2900,13 @@ export class DataProvider {
       if (lastStart) {
         // Did we empty it AFTER we started it?
         const lastEmpty = itemLogs.find(l => l.action_type === 'empty_batch');
-        const startDate = new Date(lastStart.entry_date).getTime();
-        const emptyDate = lastEmpty ? new Date(lastEmpty.entry_date).getTime() : 0;
+        const startDate = new Date(lastStart.created_at || lastStart.entry_date).getTime();
+        const emptyDate = lastEmpty ? new Date(lastEmpty.created_at || lastEmpty.entry_date).getTime() : 0;
 
         if (startDate > emptyDate || !lastEmpty) {
           // This batch is currently active in the wash bay!
           // Calculate vehicles washed since startDate
-          const jobsSince = this.jobs.filter(j => j.company_id === cid && new Date(j.entry_date).getTime() >= startDate);
+          const jobsSince = this.jobs.filter(j => j.company_id === cid && new Date(j.created_at || j.entry_date).getTime() >= startDate);
           const washedCount = jobsSince.length;
           
           const expectedTotal = lastStart.quantity * item.expected_washes;
