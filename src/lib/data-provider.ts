@@ -2779,7 +2779,7 @@ export class DataProvider {
         ...l,
         item_name: this.inventoryItems.find(i => i.id === l.item_id)?.name || 'Unknown Item'
       }))
-      .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+      .sort((a, b) => new Date(b.created_at || b.entry_date).getTime() - new Date(a.created_at || a.entry_date).getTime());
   }
 
   public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number }): Promise<{ success: boolean; error?: string }> {
