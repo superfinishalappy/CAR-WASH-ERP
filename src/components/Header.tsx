@@ -15,6 +15,7 @@ import {
   Sparkles,
   AlertTriangle,
   Menu,
+  Package,
   Car,
   History,
   Users,
@@ -147,6 +148,11 @@ export function Header() {
       title: t.nav.allCompanies,
       category: language === 'ar' ? 'المنصة · الشركات والمستأجرين' : 'Platform · Tenants & Licenses',
       icon: Building,
+    },
+    inventory: {
+      title: 'Inventory',
+      category: language === 'ar' ? 'العمليات · المخزون' : 'Operations · Stock Room',
+      icon: Package,
     },
   };
 
