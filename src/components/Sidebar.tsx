@@ -17,6 +17,7 @@ import {
   Wrench,
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
   LogOut,
   Sun,
   Moon,
