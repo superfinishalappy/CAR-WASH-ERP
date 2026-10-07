@@ -79,12 +79,16 @@ export default function InventoryScreen() {
     e.preventDefault();
     if (!actionItem || !actionQuantity) return;
 
-    await dataProvider.addInventoryLog({
+    const res = await dataProvider.addInventoryLog({
       item_id: actionItem.id,
       action_type: actionType,
       quantity: Number(actionQuantity),
       note: actionNote,
     });
+
+    if (!res.success) {
+      alert('Error: ' + res.error);
+    }
 
     setShowActionModal(false);
     setActionQuantity('1');
