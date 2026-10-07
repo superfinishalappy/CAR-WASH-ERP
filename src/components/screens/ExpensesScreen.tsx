@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
-import { Expense } from '@/types/database';
+import { Expense, FixedExpense } from '@/types/database';
 import {
   Receipt,
   Plus,
@@ -16,6 +16,8 @@ import {
   Filter,
   AlertTriangle,
   X,
+  Repeat,
+  Wallet,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import { getTodayString, getFirstDayOfMonthString } from '@/lib/date-utils';
@@ -26,9 +28,13 @@ export function ExpensesScreen() {
   const todayStr = getTodayString(session?.company?.timezone);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'operating' | 'fixed'>('operating');
 
   // Filter States
   const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'this_month' | 'all' | 'custom'>('this_month');
@@ -41,8 +47,14 @@ export function ExpensesScreen() {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
 
+  // Fixed Expense Form State
+  const [feName, setFeName] = useState('');
+  const [feAmount, setFeAmount] = useState('');
+  const [feFrequency, setFeFrequency] = useState<'monthly'|'weekly'|'daily'>('monthly');
+
   // Delete Confirmation State
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
+  const [deletingFixed, setDeletingFixed] = useState<FixedExpense | null>(null);
 
   const role = session?.profile.role || 'staff';
   const isOwner = role === 'owner' || ['superadmin', 'superstaff'].includes(role);
@@ -52,6 +64,7 @@ export function ExpensesScreen() {
     // Get ALL expenses, no longer constrained to selectedDate for the view
     const list = dataProvider.getExpenses();
     setExpenses(list);
+    setFixedExpenses(dataProvider.getFixedExpenses());
 
     const s = dataProvider.getSettings();
     setCategories(s.expense_categories);
@@ -152,6 +165,38 @@ export function ExpensesScreen() {
     }
   };
 
+  const handleAddFixedExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feName || !feAmount) return;
+
+    const res = await dataProvider.addFixedExpense({
+      name: feName,
+      amount: Number(feAmount),
+      frequency: feFrequency
+    });
+
+    if (res.success) {
+      showToast('Fixed expense added', 'success');
+      setFeName('');
+      setFeAmount('');
+      triggerRefresh();
+    } else {
+      showToast(res.error || 'Failed to add fixed expense', 'error');
+    }
+  };
+
+  const confirmDeleteFixed = async () => {
+    if (!deletingFixed) return;
+    const res = await dataProvider.deleteFixedExpense(deletingFixed.id);
+    if (res.success) {
+      showToast('Fixed expense deleted', 'info');
+      setDeletingFixed(null);
+      triggerRefresh();
+    } else {
+      showToast(res.error || 'Failed to delete fixed expense', 'error');
+    }
+  };
+
   const totalExpense = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   return (
@@ -188,7 +233,34 @@ export function ExpensesScreen() {
         </div>
       </div>
 
-      {/* Add Expense Form Card */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-4 rtl:space-x-reverse text-xs sm:text-sm font-semibold">
+        <button
+          onClick={() => setActiveTab('operating')}
+          className={`pb-3 flex items-center gap-2 border-b-2 transition ${
+            activeTab === 'operating'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          Operating Expenses
+        </button>
+        <button
+          onClick={() => setActiveTab('fixed')}
+          className={`pb-3 flex items-center gap-2 border-b-2 transition ${
+            activeTab === 'fixed'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Wallet className="w-4 h-4" />
+          Fixed Expenses
+        </button>
+      </div>
+
+      {activeTab === 'operating' ? (
+        <>
+          {/* Add Expense Form Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">
         <h2 className="text-sm font-bold text-slate-900 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
           <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -464,6 +536,53 @@ export function ExpensesScreen() {
               <button
                 type="button"
                 onClick={confirmDeleteExpense}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingFixed && (
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center border border-rose-200 dark:border-rose-800/40 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Delete Fixed Expense?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Are you sure you want to permanently delete this recurring expense?</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Name:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{deletingFixed.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Amount:</span>
+                <span className="font-black text-rose-600 dark:text-rose-400">
+                  {Number(deletingFixed.amount).toFixed(2)} {currency} / {deletingFixed.frequency}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingFixed(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteFixed}
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />

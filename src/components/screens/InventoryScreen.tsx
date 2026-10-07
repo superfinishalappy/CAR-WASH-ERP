@@ -365,12 +365,12 @@ export default function InventoryScreen() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Initial Stock</label>
-                    <input type="number" required min="0" value={newItemStock} onChange={e => setNewItemStock(e.target.value)} placeholder="e.g. 5" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
+                    <input type="number" step="any" required min="0" value={newItemStock} onChange={e => setNewItemStock(e.target.value)} placeholder="e.g. 5" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Expected Washes (Per 1 Unit)</label>
-                  <input type="number" required min="0" value={newItemWashes} onChange={e => setNewItemWashes(e.target.value)} placeholder="e.g. 125" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
+                  <input type="number" step="any" required min="0" value={newItemWashes} onChange={e => setNewItemWashes(e.target.value)} placeholder="e.g. 125" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
                   <p className="text-xs text-slate-500 mt-2 font-medium">How many vehicles can 1 {newItemUnit} wash? Used to calculate live burn rates.</p>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
@@ -395,7 +395,7 @@ export default function InventoryScreen() {
               <form onSubmit={handleAction} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quantity ({actionItem.unit})</label>
-                  <input type="number" required min="1" max={actionType !== 'add_stock' ? actionItem.current_stock : undefined} value={actionQuantity} onChange={e => setActionQuantity(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                  <input type="number" step="any" required min="0.01" max={actionType !== 'add_stock' ? actionItem.current_stock : undefined} value={actionQuantity} onChange={e => setActionQuantity(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-4">
@@ -426,7 +426,7 @@ export default function InventoryScreen() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Washes / Unit</label>
-                    <input type="number" required min="0" value={editingItem.expected_washes || 0} onChange={e => setEditingItem({...editingItem, expected_washes: Number(e.target.value)})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                    <input type="number" step="any" required min="0" value={editingItem.expected_washes || 0} onChange={e => setEditingItem({...editingItem, expected_washes: Number(e.target.value)})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
                   </div>
                 </div>
                 

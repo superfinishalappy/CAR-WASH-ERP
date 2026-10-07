@@ -15,6 +15,7 @@ import {
   AppRole,
   InventoryItem,
   InventoryLog,
+  FixedExpense,
 } from '@/types/database';
 import { supabase, buildSyntheticEmail } from '@/lib/supabase';
 import {
@@ -70,6 +71,10 @@ export class DataProvider {
   // Phase 2: Inventory
   private inventoryItems: InventoryItem[] = [];
   private inventoryLogs: InventoryLog[] = [];
+  
+  // Phase 3: Fixed Expenses
+  private fixedExpenses: FixedExpense[] = [];
+  
   private currentSession: UserSession | null = null;
   private isInitialized = false;
 
@@ -221,6 +226,16 @@ export class DataProvider {
       const { data: invLogData, error: invLogErr } = await invLogQuery;
       if (!invLogErr && invLogData) {
         this.inventoryLogs = invLogData;
+      }
+      
+      // 13. Fixed Expenses
+      let feQuery = supabase.from('fixed_expenses').select('*');
+      if (!isPlatform && cid) {
+        feQuery = feQuery.eq('company_id', cid);
+      }
+      const { data: feData, error: feErr } = await feQuery;
+      if (!feErr && feData) {
+        this.fixedExpenses = feData;
       }
 
       // If active session exists, refresh company & profile in session
@@ -2253,9 +2268,12 @@ export class DataProvider {
 
     const daysDiff = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24)) + 1);
     const monthlyRent = settings.monthly_rent || 0;
-    const monthlyOther = settings.monthly_fixed_costs || 0;
-    const weeklyOther = settings.weekly_fixed_costs || 0;
-    const dailyOther = settings.daily_fixed_costs || 0;
+    
+    // Sum fixed expenses by frequency
+    const pFixedExps = this.fixedExpenses.filter(e => e.company_id === cid);
+    const monthlyOther = pFixedExps.filter(e => e.frequency === 'monthly').reduce((sum, e) => sum + Number(e.amount), 0) + (settings.monthly_fixed_costs || 0);
+    const weeklyOther = pFixedExps.filter(e => e.frequency === 'weekly').reduce((sum, e) => sum + Number(e.amount), 0) + (settings.weekly_fixed_costs || 0);
+    const dailyOther = pFixedExps.filter(e => e.frequency === 'daily').reduce((sum, e) => sum + Number(e.amount), 0) + (settings.daily_fixed_costs || 0);
     
     // Convert all to daily rate, then multiply by days in period
     const dailyAmortizedFixed = (monthlyRent + monthlyOther) / 30 + (weeklyOther / 7) + dailyOther;
@@ -2924,6 +2942,55 @@ export class DataProvider {
     }
     
     return activeBatches;
+  }
+
+  // --- Phase 3: Fixed Expenses Methods ---
+  public getFixedExpenses(companyId?: string): FixedExpense[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    return this.fixedExpenses.filter(e => e.company_id === cid);
+  }
+
+  public async addFixedExpense(payload: { name: string; amount: number; frequency: 'monthly' | 'weekly' | 'daily' }): Promise<{ success: boolean; error?: string }> {
+    const cid = this.getEffectiveCompanyId();
+    if (!cid) return { success: false, error: 'No active company' };
+
+    const exp: FixedExpense = {
+      id: generateUUID(),
+      company_id: cid,
+      ...payload,
+      created_at: new Date().toISOString()
+    };
+
+    this.fixedExpenses = [exp, ...this.fixedExpenses];
+    this.logAudit('fixed_expenses', cid, 'INSERT', null, exp);
+
+    if (supabase) {
+      const { error } = await supabase.from('fixed_expenses').insert(exp);
+      if (error) {
+        this.fixedExpenses = this.fixedExpenses.filter(e => e.id !== exp.id);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
+  }
+
+  public async deleteFixedExpense(id: string): Promise<{ success: boolean; error?: string }> {
+    const idx = this.fixedExpenses.findIndex(e => e.id === id);
+    if (idx === -1) return { success: false, error: 'Not found' };
+
+    const exp = this.fixedExpenses[idx];
+    this.fixedExpenses = this.fixedExpenses.filter(e => e.id !== id);
+    this.logAudit('fixed_expenses', exp.company_id, 'DELETE', exp, null);
+
+    if (supabase) {
+      const { error } = await supabase.from('fixed_expenses').delete().eq('id', id);
+      if (error) {
+        this.fixedExpenses.splice(idx, 0, exp);
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: true };
   }
 }
 

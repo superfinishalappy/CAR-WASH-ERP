@@ -292,3 +292,12 @@ export interface InventoryLog {
   created_at?: string;
   item_name?: string; // For joins
 }
+
+export interface FixedExpense {
+  id: string;
+  company_id: string;
+  name: string;
+  amount: number;
+  frequency: 'monthly' | 'weekly' | 'daily';
+  created_at?: string;
+}
