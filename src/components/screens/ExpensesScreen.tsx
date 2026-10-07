@@ -487,6 +487,118 @@ export function ExpensesScreen() {
           itemName="expenses"
         />
       </div>
+        </>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              Add Fixed Expense
+            </h2>
+            <form onSubmit={handleAddFixedExpense} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Expense Name</label>
+                <input
+                  type="text"
+                  value={feName}
+                  onChange={(e) => setFeName(e.target.value)}
+                  placeholder="e.g. Internet Bill"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Amount</label>
+                <div className="relative">
+                  <DollarSign className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={feAmount}
+                    onChange={(e) => setFeAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Frequency</label>
+                <select
+                  value={feFrequency}
+                  onChange={(e) => setFeFrequency(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="daily">Daily</option>
+                </select>
+              </div>
+              <div className="sm:col-span-4 flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={!isOwner}
+                  className="py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 transition disabled:opacity-50"
+                >
+                  Add Fixed Expense
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900/90 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800">
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Expense Name</th>
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Frequency</th>
+                    <th className="px-5 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {fixedExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">
+                        No fixed expenses configured yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    fixedExpenses.map((exp) => (
+                      <tr key={exp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors group">
+                        <td className="px-5 py-4 font-bold text-slate-900 dark:text-white text-sm">
+                          {exp.name}
+                        </td>
+                        <td className="px-5 py-4 font-black text-slate-900 dark:text-white">
+                          {Number(exp.amount).toFixed(2)} {currency}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 capitalize">
+                            {exp.frequency}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            onClick={() => setDeletingFixed(exp)}
+                            disabled={!isOwner}
+                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950 transition opacity-50 group-hover:opacity-100 disabled:opacity-20"
+                            title="Delete fixed expense"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Expense Confirmation Modal */}
       {deletingExpense && (
