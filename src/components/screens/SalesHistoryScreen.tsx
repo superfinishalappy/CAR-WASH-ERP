@@ -506,9 +506,6 @@ export function SalesHistoryScreen() {
               }`}
             >
               <span>All Sales</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${statusFilter === 'all' ? 'bg-white/20' : 'bg-slate-200 dark:bg-slate-800'}`}>
-                {overallCounts.all}
-              </span>
             </button>
 
             <button
@@ -521,9 +518,6 @@ export function SalesHistoryScreen() {
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Unpaid Only</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${statusFilter === 'unpaid' ? 'bg-white/20' : 'bg-rose-100 dark:bg-rose-900/50'}`}>
-                {overallCounts.unpaid}
-              </span>
             </button>
 
             <button
@@ -536,9 +530,6 @@ export function SalesHistoryScreen() {
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Paid Only</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${statusFilter === 'paid' ? 'bg-white/20' : 'bg-emerald-100 dark:bg-emerald-900/50'}`}>
-                {overallCounts.paid}
-              </span>
             </button>
           </div>
 
