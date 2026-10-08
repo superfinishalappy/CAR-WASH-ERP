@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Shield,
   Sparkles,
+  Package,
 } from 'lucide-react';
 
 export function MobileDrawer() {
@@ -88,6 +89,14 @@ export function MobileDrawer() {
       sublabel: 'Accounts, credit limits, settle vehicles',
       icon: <Users className="w-5 h-5" />,
       color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+      visible: true,
+    },
+    {
+      id: 'inventory' as NavTab,
+      label: 'Inventory',
+      sublabel: 'Stock control & wash bay batches',
+      icon: <Package className="w-5 h-5" />,
+      color: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
       visible: true,
     },
     {
