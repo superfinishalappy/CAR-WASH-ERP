@@ -2850,7 +2850,7 @@ export class DataProvider {
     return { success: true };
   }
 
-  public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string }): Promise<{ success: boolean; error?: string }> {
+  public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string; total_cost?: number }): Promise<{ success: boolean; error?: string }> {
     const cid = this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'No active company' };
     const username = this.currentSession?.user.username || 'unknown';
@@ -2861,6 +2861,7 @@ export class DataProvider {
       item_id: payload.item_id,
       action_type: payload.action_type,
       quantity: payload.quantity,
+      total_cost: payload.total_cost,
       entry_date: getLocalDateString(new Date()),
       note: payload.note || null,
       created_by: username,

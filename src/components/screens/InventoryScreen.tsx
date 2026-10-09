@@ -19,6 +19,7 @@ export default function InventoryScreen() {
   const [actionItem, setActionItem] = useState<InventoryItem | null>(null);
   const [actionType, setActionType] = useState<'add_stock' | 'start_batch' | 'write_off'>('add_stock');
   const [actionQuantity, setActionQuantity] = useState('1');
+  const [actionCost, setActionCost] = useState('');
   const [actionNote, setActionNote] = useState('');
   
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -83,6 +84,7 @@ export default function InventoryScreen() {
       item_id: actionItem.id,
       action_type: actionType,
       quantity: Number(actionQuantity),
+      total_cost: actionType === 'add_stock' && actionCost ? Number(actionCost) : undefined,
       note: actionNote,
     });
 
@@ -92,6 +94,7 @@ export default function InventoryScreen() {
 
     setShowActionModal(false);
     setActionQuantity('1');
+    setActionCost('');
     setActionNote('');
     loadData();
   };
@@ -310,6 +313,7 @@ export default function InventoryScreen() {
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Item</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cost</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User</th>
                 </tr>
               </thead>
@@ -334,6 +338,9 @@ export default function InventoryScreen() {
                     </td>
                     <td className="p-4 text-sm font-bold text-slate-900 dark:text-white">
                       {log.action_type === 'empty_batch' ? '-' : log.quantity}
+                    </td>
+                    <td className="p-4 text-sm font-bold text-slate-900 dark:text-white">
+                      {log.total_cost ? Number(log.total_cost).toLocaleString() : '-'}
                     </td>
                     <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">
                       {log.created_by}
@@ -401,6 +408,13 @@ export default function InventoryScreen() {
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quantity ({actionItem.unit})</label>
                   <input type="number" step="any" required min="0.01" max={actionType !== 'add_stock' ? actionItem.current_stock : undefined} value={actionQuantity} onChange={e => setActionQuantity(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
                 </div>
+
+                {actionType === 'add_stock' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Purchase Price (Optional)</label>
+                    <input type="number" step="any" min="0" value={actionCost} onChange={e => setActionCost(e.target.value)} placeholder="e.g. 2000" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                  </div>
+                )}
                 
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setShowActionModal(false)} className="px-4 py-2 font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancel</button>

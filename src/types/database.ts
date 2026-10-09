@@ -286,6 +286,7 @@ export interface InventoryLog {
   item_id: string;
   action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off';
   quantity: number;
+  total_cost?: number;
   entry_date: string;
   note: string | null;
   created_by?: string;
