@@ -13,6 +13,7 @@ export default function InventoryScreen() {
   const [newItemName, setNewItemName] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('Liters');
   const [newItemStock, setNewItemStock] = useState('');
+  const [newItemCost, setNewItemCost] = useState('');
   const [newItemWashes, setNewItemWashes] = useState('');
 
   const [showActionModal, setShowActionModal] = useState(false);
@@ -41,17 +42,28 @@ export default function InventoryScreen() {
     e.preventDefault();
     if (!newItemName) return;
 
-    await dataProvider.addInventoryItem({
+    const res = await dataProvider.addInventoryItem({
       name: newItemName,
       unit: newItemUnit,
       current_stock: Number(newItemStock) || 0,
       expected_washes: Number(newItemWashes) || 0,
     });
     
+    // Auto-create initial stock log if there's stock
+    if (res.success && res.item_id && Number(newItemStock) > 0) {
+      await dataProvider.addInventoryLog({
+        item_id: res.item_id,
+        action_type: 'add_stock',
+        quantity: Number(newItemStock),
+        total_cost: newItemCost ? Number(newItemCost) : undefined,
+        note: 'Initial stock',
+      });
+    }
+
     setShowAddModal(false);
     setNewItemName('');
-    setNewItemName('');
     setNewItemStock('');
+    setNewItemCost('');
     setNewItemWashes('');
     loadData();
   };
@@ -379,6 +391,13 @@ export default function InventoryScreen() {
                     <input type="number" step="any" required min="0" value={newItemStock} onChange={e => setNewItemStock(e.target.value)} placeholder="e.g. 5" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
                   </div>
                 </div>
+
+                {Number(newItemStock) > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Purchase Price (Optional)</label>
+                    <input type="number" step="any" min="0" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} placeholder="e.g. 2000" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Expected Washes (Per 1 Unit)</label>
                   <input type="number" step="any" required min="0" value={newItemWashes} onChange={e => setNewItemWashes(e.target.value)} placeholder="e.g. 125" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />

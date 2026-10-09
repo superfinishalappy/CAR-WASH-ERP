@@ -2782,7 +2782,7 @@ export class DataProvider {
       .sort((a, b) => new Date(b.created_at || b.entry_date).getTime() - new Date(a.created_at || a.entry_date).getTime());
   }
 
-  public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number }): Promise<{ success: boolean; error?: string }> {
+  public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number }): Promise<{ success: boolean; error?: string; item_id?: string }> {
     const cid = this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'No active company' };
 
@@ -2807,7 +2807,7 @@ export class DataProvider {
         return { success: false, error: error.message };
       }
     }
-    return { success: true };
+    return { success: true, item_id: newItem.id };
   }
 
   public async updateInventoryItem(id: string, payload: Partial<InventoryItem>): Promise<{ success: boolean; error?: string }> {
