@@ -276,6 +276,7 @@ export interface InventoryItem {
   unit: string;
   current_stock: number;
   expected_washes: number;
+  sku?: string;
   created_at?: string;
   updated_at?: string;
 }

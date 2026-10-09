@@ -2782,7 +2782,7 @@ export class DataProvider {
       .sort((a, b) => new Date(b.created_at || b.entry_date).getTime() - new Date(a.created_at || a.entry_date).getTime());
   }
 
-  public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number }): Promise<{ success: boolean; error?: string; item_id?: string }> {
+  public async addInventoryItem(payload: { name: string; unit: string; current_stock: number; expected_washes: number; sku?: string }): Promise<{ success: boolean; error?: string; item_id?: string }> {
     const cid = this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'No active company' };
 
@@ -2793,6 +2793,7 @@ export class DataProvider {
       unit: payload.unit,
       current_stock: payload.current_stock,
       expected_washes: payload.expected_washes,
+      sku: payload.sku,
       created_at: new Date().toISOString(),
     };
 
@@ -2850,7 +2851,7 @@ export class DataProvider {
     return { success: true };
   }
 
-  public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string; total_cost?: number }): Promise<{ success: boolean; error?: string }> {
+  public async addInventoryLog(payload: { item_id: string; action_type: 'add_stock' | 'start_batch' | 'empty_batch' | 'write_off'; quantity: number; note?: string; total_cost?: number; entry_date?: string }): Promise<{ success: boolean; error?: string }> {
     const cid = this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'No active company' };
     const username = this.currentSession?.user.username || 'unknown';
@@ -2862,7 +2863,7 @@ export class DataProvider {
       action_type: payload.action_type,
       quantity: payload.quantity,
       total_cost: payload.total_cost,
-      entry_date: getLocalDateString(new Date()),
+      entry_date: payload.entry_date || getLocalDateString(new Date()),
       note: payload.note || null,
       created_by: username,
       created_at: new Date().toISOString(),

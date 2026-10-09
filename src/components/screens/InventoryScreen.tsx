@@ -3,15 +3,18 @@ import { dataProvider } from '@/lib/data-provider';
 import { InventoryItem, InventoryLog } from '@/types/database';
 
 export default function InventoryScreen() {
-  const [activeTab, setActiveTab] = useState<'levels' | 'washbay' | 'history'>('levels');
+  const [activeTab, setActiveTab] = useState<'levels' | 'washbay' | 'purchases' | 'history'>('levels');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [activeBatches, setActiveBatches] = useState<any[]>([]);
   const [logs, setLogs] = useState<InventoryLog[]>([]);
+  const [purchaseFilterItem, setPurchaseFilterItem] = useState('');
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('Liters');
+  const [newItemSku, setNewItemSku] = useState('');
   const [newItemStock, setNewItemStock] = useState('');
   const [newItemCost, setNewItemCost] = useState('');
   const [newItemWashes, setNewItemWashes] = useState('');
@@ -22,6 +25,7 @@ export default function InventoryScreen() {
   const [actionQuantity, setActionQuantity] = useState('1');
   const [actionCost, setActionCost] = useState('');
   const [actionNote, setActionNote] = useState('');
+  const [actionDate, setActionDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
@@ -47,6 +51,7 @@ export default function InventoryScreen() {
       unit: newItemUnit,
       current_stock: Number(newItemStock) || 0,
       expected_washes: Number(newItemWashes) || 0,
+      sku: newItemSku || undefined,
     });
     
     // Auto-create initial stock log if there's stock
@@ -62,6 +67,7 @@ export default function InventoryScreen() {
 
     setShowAddModal(false);
     setNewItemName('');
+    setNewItemSku('');
     setNewItemStock('');
     setNewItemCost('');
     setNewItemWashes('');
@@ -98,6 +104,7 @@ export default function InventoryScreen() {
       quantity: Number(actionQuantity),
       total_cost: actionType === 'add_stock' && actionCost ? Number(actionCost) : undefined,
       note: actionNote,
+      entry_date: actionType === 'add_stock' ? actionDate : undefined,
     });
 
     if (!res.success) {
@@ -176,6 +183,16 @@ export default function InventoryScreen() {
           }`}
         >
           History Log
+        </button>
+        <button
+          onClick={() => setActiveTab('purchases')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'purchases'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          Purchases & Pricing
         </button>
       </div>
 
@@ -314,6 +331,73 @@ export default function InventoryScreen() {
         </div>
       )}
 
+      {/* Tab: Purchases */}
+      {activeTab === 'purchases' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Filter by Product</label>
+              <select value={purchaseFilterItem} onChange={e => setPurchaseFilterItem(e.target.value)} className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none min-w-[200px]">
+                <option value="">All Products</option>
+                {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+            <button onClick={() => {
+              setActionType('add_stock');
+              setActionItem(items[0] || null);
+              setShowActionModal(true);
+            }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm">
+              + Log Purchase
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">SKU</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Product</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Unit Price</th>
+                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total Price</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {logs.filter(log => log.action_type === 'add_stock' && (!purchaseFilterItem || log.item_id === purchaseFilterItem)).map(log => {
+                    const product = items.find(i => i.id === log.item_id);
+                    const unitPrice = log.total_cost ? (log.total_cost / log.quantity) : 0;
+                    return (
+                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                        <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">
+                          {new Date(log.entry_date || log.created_at || '').toLocaleDateString()}
+                        </td>
+                        <td className="p-4 text-sm font-mono text-slate-500">
+                          {product?.sku || '-'}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-slate-900 dark:text-white">
+                          {log.item_name}
+                        </td>
+                        <td className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300">
+                          {log.quantity} {product?.unit}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          {unitPrice > 0 ? `${unitPrice.toFixed(2)} / ${product?.unit || 'unit'}` : '-'}
+                        </td>
+                        <td className="p-4 text-sm font-bold text-slate-900 dark:text-white">
+                          {log.total_cost ? Number(log.total_cost).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab: History */}
       {activeTab === 'history' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
@@ -372,9 +456,15 @@ export default function InventoryScreen() {
             <div className="p-6">
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6">Add Inventory Item</h3>
               <form onSubmit={handleCreateItem} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
-                  <input type="text" required value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="e.g. Shampoo Premium" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
+                    <input type="text" required value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="e.g. Shampoo Premium" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">SKU / Barcode (Optional)</label>
+                    <input type="text" value={newItemSku} onChange={e => setNewItemSku(e.target.value)} placeholder="e.g. SHAMP-01" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white outline-none" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -429,9 +519,15 @@ export default function InventoryScreen() {
                 </div>
 
                 {actionType === 'add_stock' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Purchase Price (Optional)</label>
-                    <input type="number" step="any" min="0" value={actionCost} onChange={e => setActionCost(e.target.value)} placeholder="e.g. 2000" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Purchase Date</label>
+                      <input type="date" value={actionDate} onChange={e => setActionDate(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Purchase Price</label>
+                      <input type="number" step="any" min="0" value={actionCost} onChange={e => setActionCost(e.target.value)} placeholder="e.g. 2000" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-lg font-bold outline-none" />
+                    </div>
                   </div>
                 )}
                 
@@ -452,9 +548,15 @@ export default function InventoryScreen() {
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6">Edit Item</h3>
               
               <form onSubmit={handleUpdateItem} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
-                  <input type="text" required value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Item Name</label>
+                    <input type="text" required value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">SKU</label>
+                    <input type="text" value={editingItem.sku || ''} onChange={e => setEditingItem({...editingItem, sku: e.target.value})} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium outline-none" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
