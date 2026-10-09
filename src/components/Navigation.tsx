@@ -37,12 +37,6 @@ export function Navigation() {
   // All available tabs for desktop
   const allItems: NavItem[] = [
     {
-      id: 'admin' as NavTab,
-      label: t.nav.allCompanies,
-      icon: <Building className="w-4 h-4" />,
-      visible: isPlatform,
-    },
-    {
       id: 'vehicles' as NavTab,
       label: t.nav.vehicles,
       icon: <Car className="w-4 h-4" />,
@@ -73,16 +67,22 @@ export function Navigation() {
       visible: true,
     },
     {
+      id: 'attendance' as NavTab,
+      label: t.nav.attendance,
+      icon: <CalendarCheck className="w-4 h-4" />,
+      visible: true,
+    },
+    {
       id: 'advances' as NavTab,
       label: t.nav.advances,
       icon: <Banknote className="w-4 h-4" />,
       visible: true,
     },
     {
-      id: 'attendance' as NavTab,
-      label: t.nav.attendance,
-      icon: <CalendarCheck className="w-4 h-4" />,
-      visible: true,
+      id: 'reports' as NavTab,
+      label: t.nav.reports,
+      icon: <BarChart3 className="w-4 h-4" />,
+      visible: canReports,
     },
     {
       id: 'team' as NavTab,
@@ -91,10 +91,10 @@ export function Navigation() {
       visible: canTeam,
     },
     {
-      id: 'reports' as NavTab,
-      label: t.nav.reports,
-      icon: <BarChart3 className="w-4 h-4" />,
-      visible: canReports,
+      id: 'admin' as NavTab,
+      label: t.nav.allCompanies,
+      icon: <Building className="w-4 h-4" />,
+      visible: isPlatform,
     },
   ].filter((item) => item.visible);
 

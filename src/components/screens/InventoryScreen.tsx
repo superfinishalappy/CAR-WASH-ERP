@@ -160,6 +160,16 @@ export default function InventoryScreen() {
           Store Room (Stock Levels)
         </button>
         <button
+          onClick={() => setActiveTab('purchases')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'purchases'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          Purchases & Pricing
+        </button>
+        <button
           onClick={() => setActiveTab('washbay')}
           className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
             activeTab === 'washbay'
@@ -183,16 +193,6 @@ export default function InventoryScreen() {
           }`}
         >
           History Log
-        </button>
-        <button
-          onClick={() => setActiveTab('purchases')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'purchases'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          Purchases & Pricing
         </button>
       </div>
 

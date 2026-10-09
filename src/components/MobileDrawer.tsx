@@ -60,14 +60,6 @@ export function MobileDrawer() {
 
   const items: DrawerItem[] = [
     {
-      id: 'admin' as NavTab,
-      label: t.nav.allCompanies,
-      sublabel: 'Manage all workshop tenants & licenses',
-      icon: <Building className="w-5 h-5" />,
-      color: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-      visible: isPlatform,
-    },
-    {
       id: 'vehicles' as NavTab,
       label: t.nav.vehicles,
       sublabel: 'Daily counter orders & vehicle dispatch',
@@ -108,6 +100,14 @@ export function MobileDrawer() {
       visible: true,
     },
     {
+      id: 'attendance' as NavTab,
+      label: t.nav.attendance,
+      sublabel: 'Staff roster & present on duty log',
+      icon: <CalendarCheck className="w-5 h-5" />,
+      color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+      visible: true,
+    },
+    {
       id: 'advances' as NavTab,
       label: t.nav.advances,
       sublabel: 'Staff salary advances & deductions',
@@ -116,12 +116,12 @@ export function MobileDrawer() {
       visible: true,
     },
     {
-      id: 'attendance' as NavTab,
-      label: t.nav.attendance,
-      sublabel: 'Staff roster & present on duty log',
-      icon: <CalendarCheck className="w-5 h-5" />,
-      color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-      visible: true,
+      id: 'reports' as NavTab,
+      label: t.nav.reports,
+      sublabel: 'P&L, margins, 10 health rules',
+      icon: <BarChart3 className="w-5 h-5" />,
+      color: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
+      visible: canReports,
     },
     {
       id: 'team' as NavTab,
@@ -132,12 +132,12 @@ export function MobileDrawer() {
       visible: canTeam,
     },
     {
-      id: 'reports' as NavTab,
-      label: t.nav.reports,
-      sublabel: 'P&L, margins, 10 health rules',
-      icon: <BarChart3 className="w-5 h-5" />,
-      color: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
-      visible: canReports,
+      id: 'admin' as NavTab,
+      label: t.nav.allCompanies,
+      sublabel: 'Manage all workshop tenants & licenses',
+      icon: <Building className="w-5 h-5" />,
+      color: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+      visible: isPlatform,
     },
   ].filter((item) => item.visible);
 
