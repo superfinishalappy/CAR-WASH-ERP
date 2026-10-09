@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
-import { Expense, FixedExpense } from '@/types/database';
+import { Expense, FixedExpense, Advance } from '@/types/database';
 import {
   Receipt,
   Plus,
@@ -33,6 +33,7 @@ export function ExpensesScreen() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [advances, setAdvances] = useState<Advance[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
@@ -69,6 +70,7 @@ export function ExpensesScreen() {
     const list = dataProvider.getExpenses();
     setExpenses(list);
     setFixedExpenses(dataProvider.getFixedExpenses());
+    setAdvances(dataProvider.getAdvances());
 
     const s = dataProvider.getSettings();
     setCategories(s.expense_categories);
@@ -110,6 +112,16 @@ export function ExpensesScreen() {
       return true;
     });
   }, [expenses, datePreset, customStartDate, customEndDate, categoryFilter, session]);
+
+  const filteredAdvances = useMemo(() => {
+    const dateRange = getDateRange();
+    return advances.filter((a) => {
+      if (dateRange) {
+        if (a.entry_date < dateRange.start || a.entry_date > dateRange.end) return false;
+      }
+      return true;
+    });
+  }, [advances, datePreset, customStartDate, customEndDate, session]);
 
   const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -271,6 +283,8 @@ export function ExpensesScreen() {
           <Wallet className="w-4 h-4" />
           Fixed Expenses
         </button>
+      </div>
+      
       {['analytics', 'operating'].includes(activeTab) && (
         <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm backdrop-blur-md">
           <div className="flex flex-col md:flex-row gap-4">
@@ -339,12 +353,12 @@ export function ExpensesScreen() {
               <div className="text-sm mt-2 font-medium text-slate-400">Total committed per cycle</div>
             </div>
             <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-3 mb-4 text-slate-500">
+              <div className="flex items-center gap-3 mb-4 opacity-80">
                 <TrendingUp className="w-5 h-5 text-rose-500" />
-                <span className="font-bold uppercase tracking-wider text-xs">Combined Total</span>
+                <span className="font-bold uppercase tracking-wider text-xs">Combined Outflow</span>
               </div>
-              <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-              <div className="text-sm mt-2 font-medium text-slate-500">Total capital outflow</div>
+              <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0) + filteredAdvances.reduce((sum, a) => sum + a.amount, 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-sm mt-2 font-medium text-slate-500">Includes {currency} {filteredAdvances.reduce((sum, a) => sum + a.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} in staff advances</div>
             </div>
           </div>
 
