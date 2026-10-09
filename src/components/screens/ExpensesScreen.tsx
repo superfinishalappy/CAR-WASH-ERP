@@ -148,7 +148,7 @@ export function ExpensesScreen() {
 
     // Fixed Expenses
     fixedExpenses.forEach(f => {
-      acc[f.category || 'Fixed Expense'] = (acc[f.category || 'Fixed Expense'] || 0) + f.amount;
+      acc[f.name || 'Fixed Expense'] = (acc[f.name || 'Fixed Expense'] || 0) + f.amount;
     });
 
     // Staff Advances
@@ -422,7 +422,7 @@ export function ExpensesScreen() {
                 let barColor = 'bg-blue-500';
                 if (cat === 'Staff Advances') barColor = 'bg-rose-500';
                 if (cat === 'Inventory Purchases') barColor = 'bg-emerald-500';
-                if (cat === 'Fixed Expense' || fixedExpenses.some(f => f.category === cat)) barColor = 'bg-amber-400';
+                if (cat === 'Fixed Expense' || fixedExpenses.some(f => f.name === cat)) barColor = 'bg-amber-400';
 
                 return (
                   <div key={cat} className="space-y-2">
