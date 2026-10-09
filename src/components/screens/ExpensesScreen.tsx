@@ -138,6 +138,30 @@ export function ExpensesScreen() {
     });
   }, [inventoryLogs, datePreset, customStartDate, customEndDate, session]);
 
+  const combinedCategoryBreakdown = useMemo(() => {
+    const acc: Record<string, number> = {};
+    
+    // Operating Expenses
+    filteredExpenses.forEach(e => {
+      acc[e.category] = (acc[e.category] || 0) + e.amount;
+    });
+
+    // Fixed Expenses
+    fixedExpenses.forEach(f => {
+      acc[f.category || 'Fixed Expense'] = (acc[f.category || 'Fixed Expense'] || 0) + f.amount;
+    });
+
+    // Staff Advances
+    const totalAdvances = filteredAdvances.reduce((sum, a) => sum + a.amount, 0);
+    if (totalAdvances > 0) acc['Staff Advances'] = totalAdvances;
+
+    // Inventory Purchases
+    const totalInventory = filteredInventoryPurchases.reduce((sum, log) => sum + (log.total_cost || 0), 0);
+    if (totalInventory > 0) acc['Inventory Purchases'] = totalInventory;
+
+    return Object.entries(acc).sort((a, b) => b[1] - a[1]);
+  }, [filteredExpenses, fixedExpenses, filteredAdvances, filteredInventoryPurchases]);
+
   const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const canAddSelectedDate = isOwner || selectedDate === todayStr;
@@ -388,17 +412,18 @@ export function ExpensesScreen() {
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
             <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-blue-500" />
-              Category Breakdown (Operating)
+              Category Breakdown (All Expenses)
             </h3>
             <div className="space-y-4">
-              {Object.entries(
-                filteredExpenses.reduce((acc, curr) => {
-                  acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
-                  return acc;
-                }, {} as Record<string, number>)
-              ).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => {
-                const totalOperating = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-                const pct = totalOperating > 0 ? (amt / totalOperating) * 100 : 0;
+              {combinedCategoryBreakdown.map(([cat, amt]) => {
+                const totalOutflow = combinedCategoryBreakdown.reduce((sum, [_, val]) => sum + val, 0);
+                const pct = totalOutflow > 0 ? (amt / totalOutflow) * 100 : 0;
+                
+                let barColor = 'bg-blue-500';
+                if (cat === 'Staff Advances') barColor = 'bg-rose-500';
+                if (cat === 'Inventory Purchases') barColor = 'bg-emerald-500';
+                if (cat === 'Fixed Expense' || fixedExpenses.some(f => f.category === cat)) barColor = 'bg-amber-400';
+
                 return (
                   <div key={cat} className="space-y-2">
                     <div className="flex justify-between text-sm font-bold">
@@ -406,14 +431,14 @@ export function ExpensesScreen() {
                       <span className="text-slate-900 dark:text-white">{currency} {amt.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                     </div>
                     <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                      <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }}></div>
                     </div>
                   </div>
                 );
               })}
-              {filteredExpenses.length === 0 && (
+              {combinedCategoryBreakdown.length === 0 && (
                 <div className="text-center py-8 text-slate-500 font-medium text-sm">
-                  No operating expenses found for this date range.
+                  No expenses or outflows found for this date range.
                 </div>
               )}
             </div>
