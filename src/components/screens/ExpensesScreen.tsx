@@ -18,6 +18,10 @@ import {
   X,
   Repeat,
   Wallet,
+  BarChart3,
+  PieChart,
+  TrendingUp,
+  Download,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import { getTodayString, getFirstDayOfMonthString } from '@/lib/date-utils';
@@ -34,7 +38,7 @@ export function ExpensesScreen() {
   const PAGE_SIZE = 50;
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'operating' | 'fixed'>('operating');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'operating' | 'fixed'>('analytics');
 
   // Filter States
   const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'this_month' | 'all' | 'custom'>('this_month');
@@ -235,6 +239,17 @@ export function ExpensesScreen() {
 
       <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-4 rtl:space-x-reverse text-xs sm:text-sm font-semibold">
         <button
+          onClick={() => setActiveTab('analytics')}
+          className={`pb-3 flex items-center gap-2 border-b-2 transition ${
+            activeTab === 'analytics'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Analytics & Overview
+        </button>
+        <button
           onClick={() => setActiveTab('operating')}
           className={`pb-3 flex items-center gap-2 border-b-2 transition ${
             activeTab === 'operating'
@@ -256,7 +271,118 @@ export function ExpensesScreen() {
           <Wallet className="w-4 h-4" />
           Fixed Expenses
         </button>
-      </div>
+      {['analytics', 'operating'].includes(activeTab) && (
+        <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm backdrop-blur-md">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5" /> Date Preset
+              </label>
+              <select
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this_month">This Month</option>
+                <option value="all">All Time</option>
+                <option value="custom">Custom Range</option>
+              </select>
+            </div>
+            {datePreset === 'custom' && (
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Range</label>
+                <div className="flex items-center gap-2">
+                  <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+                  <span className="text-slate-400">to</span>
+                  <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
+                </div>
+              </div>
+            )}
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" /> Category Filter
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-6 rounded-3xl bg-blue-600 text-white shadow-xl">
+              <div className="flex items-center gap-3 mb-4 opacity-80">
+                <PieChart className="w-5 h-5" />
+                <span className="font-bold uppercase tracking-wider text-xs">Total Operating Expenses</span>
+              </div>
+              <div className="text-3xl font-black">{currency} {filteredExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-sm mt-2 font-medium text-blue-100 opacity-80">Based on active date filter</div>
+            </div>
+            <div className="p-6 rounded-3xl bg-slate-900 dark:bg-slate-800 text-white shadow-xl">
+              <div className="flex items-center gap-3 mb-4 opacity-80">
+                <Wallet className="w-5 h-5 text-amber-400" />
+                <span className="font-bold uppercase tracking-wider text-xs">Total Fixed Expenses</span>
+              </div>
+              <div className="text-3xl font-black">{currency} {fixedExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-sm mt-2 font-medium text-slate-400">Total committed per cycle</div>
+            </div>
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center gap-3 mb-4 text-slate-500">
+                <TrendingUp className="w-5 h-5 text-rose-500" />
+                <span className="font-bold uppercase tracking-wider text-xs">Combined Total</span>
+              </div>
+              <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-sm mt-2 font-medium text-slate-500">Total capital outflow</div>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-500" />
+              Category Breakdown (Operating)
+            </h3>
+            <div className="space-y-4">
+              {Object.entries(
+                filteredExpenses.reduce((acc, curr) => {
+                  acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+                  return acc;
+                }, {} as Record<string, number>)
+              ).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => {
+                const totalOperating = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const pct = totalOperating > 0 ? (amt / totalOperating) * 100 : 0;
+                return (
+                  <div key={cat} className="space-y-2">
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="text-slate-700 dark:text-slate-300 capitalize">{cat}</span>
+                      <span className="text-slate-900 dark:text-white">{currency} {amt.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredExpenses.length === 0 && (
+                <div className="text-center py-8 text-slate-500 font-medium text-sm">
+                  No operating expenses found for this date range.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'operating' ? (
         <>
@@ -325,53 +451,6 @@ export function ExpensesScreen() {
             </button>
           </div>
         </form>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm backdrop-blur-md">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5" /> Date Preset
-            </label>
-            <select
-              value={datePreset}
-              onChange={(e) => setDatePreset(e.target.value as any)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="this_month">This Month</option>
-              <option value="all">All Time</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </div>
-          {datePreset === 'custom' && (
-            <div className="flex-1 space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Range</label>
-              <div className="flex items-center gap-2">
-                <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
-                <span className="text-slate-400">to</span>
-                <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate(e.target.value)} className="w-full px-2 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs" />
-              </div>
-            </div>
-          )}
-          <div className="flex-1 space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5" /> Category Filter
-            </label>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100"
-            >
-              <option value="all">All Categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
 
       {/* Expenses Table */}
