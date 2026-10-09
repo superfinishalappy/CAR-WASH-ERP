@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
-import { Expense, FixedExpense, Advance } from '@/types/database';
+import { Expense, FixedExpense, Advance, InventoryLog } from '@/types/database';
 import {
   Receipt,
   Plus,
@@ -22,6 +22,7 @@ import {
   PieChart,
   TrendingUp,
   Download,
+  Package,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import { getTodayString, getFirstDayOfMonthString } from '@/lib/date-utils';
@@ -34,6 +35,7 @@ export function ExpensesScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
+  const [inventoryLogs, setInventoryLogs] = useState<InventoryLog[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
@@ -71,6 +73,7 @@ export function ExpensesScreen() {
     setExpenses(list);
     setFixedExpenses(dataProvider.getFixedExpenses());
     setAdvances(dataProvider.getAdvances());
+    setInventoryLogs(dataProvider.getInventoryLogs());
 
     const s = dataProvider.getSettings();
     setCategories(s.expense_categories);
@@ -122,6 +125,18 @@ export function ExpensesScreen() {
       return true;
     });
   }, [advances, datePreset, customStartDate, customEndDate, session]);
+
+  const filteredInventoryPurchases = useMemo(() => {
+    const dateRange = getDateRange();
+    return inventoryLogs.filter((log) => {
+      if (log.action_type !== 'add_stock' || !log.total_cost) return false;
+      if (dateRange) {
+        const d = (log.entry_date || log.created_at || '').split('T')[0];
+        if (d < dateRange.start || d > dateRange.end) return false;
+      }
+      return true;
+    });
+  }, [inventoryLogs, datePreset, customStartDate, customEndDate, session]);
 
   const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
@@ -335,11 +350,11 @@ export function ExpensesScreen() {
 
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="p-6 rounded-3xl bg-blue-600 text-white shadow-xl">
               <div className="flex items-center gap-3 mb-4 opacity-80">
                 <PieChart className="w-5 h-5" />
-                <span className="font-bold uppercase tracking-wider text-xs">Total Operating Expenses</span>
+                <span className="font-bold uppercase tracking-wider text-xs">Operating Expenses</span>
               </div>
               <div className="text-3xl font-black">{currency} {filteredExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
               <div className="text-sm mt-2 font-medium text-blue-100 opacity-80">Based on active date filter</div>
@@ -347,17 +362,25 @@ export function ExpensesScreen() {
             <div className="p-6 rounded-3xl bg-slate-900 dark:bg-slate-800 text-white shadow-xl">
               <div className="flex items-center gap-3 mb-4 opacity-80">
                 <Wallet className="w-5 h-5 text-amber-400" />
-                <span className="font-bold uppercase tracking-wider text-xs">Total Fixed Expenses</span>
+                <span className="font-bold uppercase tracking-wider text-xs">Fixed Expenses</span>
               </div>
               <div className="text-3xl font-black">{currency} {fixedExpenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
               <div className="text-sm mt-2 font-medium text-slate-400">Total committed per cycle</div>
+            </div>
+            <div className="p-6 rounded-3xl bg-emerald-600 text-white shadow-xl">
+              <div className="flex items-center gap-3 mb-4 opacity-80">
+                <Package className="w-5 h-5" />
+                <span className="font-bold uppercase tracking-wider text-xs">Inventory Stock</span>
+              </div>
+              <div className="text-3xl font-black">{currency} {filteredInventoryPurchases.reduce((sum, log) => sum + (log.total_cost || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-sm mt-2 font-medium text-emerald-100 opacity-80">Based on active date filter</div>
             </div>
             <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="flex items-center gap-3 mb-4 opacity-80">
                 <TrendingUp className="w-5 h-5 text-rose-500" />
                 <span className="font-bold uppercase tracking-wider text-xs">Combined Outflow</span>
               </div>
-              <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0) + filteredAdvances.reduce((sum, a) => sum + a.amount, 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+              <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0) + filteredAdvances.reduce((sum, a) => sum + a.amount, 0) + filteredInventoryPurchases.reduce((sum, log) => sum + (log.total_cost || 0), 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
               <div className="text-sm mt-2 font-medium text-slate-500">Includes {currency} {filteredAdvances.reduce((sum, a) => sum + a.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} in staff advances</div>
             </div>
           </div>
