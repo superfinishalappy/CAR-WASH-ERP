@@ -1320,6 +1320,23 @@ export class DataProvider {
       .reduce((sum, j) => sum + j.total, 0);
   }
 
+  public getPastCashCollectedJobs(date: string, companyId?: string): Job[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    
+    let list = this.jobs.filter((j) => j.company_id === cid && j.payment_date === date && j.entry_date !== date);
+    
+    return list.map((j) => {
+      const staff = this.profiles.find((p) => p.id === j.staff_id);
+      const cust = j.customer_id ? this.customers.find((c) => c.id === j.customer_id) : null;
+      return {
+        ...j,
+        staff_name: staff?.full_name || 'Staff',
+        customer_name: cust?.name,
+      };
+    });
+  }
+
   public addJob(data: {
     entry_date: string;
     plate?: string;

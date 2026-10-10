@@ -41,6 +41,7 @@ export function VehiclesScreen() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [pastCollectedJobs, setPastCollectedJobs] = useState<Job[]>([]);
   const [pastCashCollected, setPastCashCollected] = useState<number>(0);
   const [activeBatches, setActiveBatches] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,6 +94,7 @@ export function VehiclesScreen() {
     const j = dataProvider.getJobs(selectedDate);
     setJobs(j);
     setPastCashCollected(dataProvider.getPastCashCollected(selectedDate));
+    setPastCollectedJobs(dataProvider.getPastCashCollectedJobs(selectedDate));
     
     const batches = dataProvider.getActiveBatches();
     setActiveBatches(batches);
@@ -613,6 +615,31 @@ export function VehiclesScreen() {
             <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
               {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Past Debts Collected Mini-Table */}
+      {pastCollectedJobs.length > 0 && (
+        <div className="bg-fuchsia-50/50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 rounded-3xl p-4 shadow-sm backdrop-blur-md">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400" />
+            <h2 className="text-xs font-bold text-fuchsia-800 dark:text-fuchsia-300 uppercase tracking-wider">
+              Past Debts Collected Today ({pastCollectedJobs.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {pastCollectedJobs.map((j) => (
+              <div key={j.id} className="bg-white dark:bg-slate-900 border border-fuchsia-100 dark:border-fuchsia-800/40 p-3 rounded-xl flex items-center justify-between shadow-sm">
+                <div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{j.plate || j.work_type}</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Washed: {j.entry_date}</div>
+                </div>
+                <div className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-400">
+                  {j.total.toFixed(2)} <span className="text-[10px] font-normal">{currency}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
