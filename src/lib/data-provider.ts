@@ -12,10 +12,10 @@ import {
   ReportData,
   UserSession,
   DiagnosticWarning,
-  AppRole,
   InventoryItem,
   InventoryLog,
   FixedExpense,
+  DailyCashAdjustment,
 } from '@/types/database';
 import { supabase, buildSyntheticEmail } from '@/lib/supabase';
 import {
@@ -74,6 +74,9 @@ export class DataProvider {
   
   // Phase 3: Fixed Expenses
   private fixedExpenses: FixedExpense[] = [];
+  
+  // Daily Cash Adjustments
+  private cashAdjustments: DailyCashAdjustment[] = [];
   
   private currentSession: UserSession | null = null;
   private isInitialized = false;
@@ -236,6 +239,16 @@ export class DataProvider {
       const { data: feData, error: feErr } = await feQuery;
       if (!feErr && feData) {
         this.fixedExpenses = feData;
+      }
+
+      // 14. Daily Cash Adjustments
+      let dcaQuery = supabase.from('daily_cash_adjustments').select('*').order('created_at', { ascending: false }).limit(500);
+      if (!isPlatform && cid) {
+        dcaQuery = dcaQuery.eq('company_id', cid);
+      }
+      const { data: dcaData, error: dcaErr } = await dcaQuery;
+      if (!dcaErr && dcaData) {
+        this.cashAdjustments = dcaData;
       }
 
       // If active session exists, refresh company & profile in session
@@ -1311,30 +1324,50 @@ export class DataProvider {
     });
   }
 
-  public getPastCashCollected(date: string, companyId?: string): number {
-    const cid = companyId || this.getEffectiveCompanyId();
-    if (!cid) return 0;
-    
-    return this.jobs
-      .filter((j) => j.company_id === cid && j.payment_date === date && j.entry_date !== date)
-      .reduce((sum, j) => sum + j.total, 0);
-  }
-
-  public getPastCashCollectedJobs(date: string, companyId?: string): Job[] {
+  public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjustment[] {
     const cid = companyId || this.getEffectiveCompanyId();
     if (!cid) return [];
+    return this.cashAdjustments.filter((a) => a.company_id === cid && a.entry_date === date);
+  }
+
+  public addDailyCashAdjustment(
+    date: string,
+    amount: number,
+    note?: string,
+    companyId?: string
+  ): { success: boolean; error?: string } {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return { success: false, error: 'Company ID required' };
     
-    let list = this.jobs.filter((j) => j.company_id === cid && j.payment_date === date && j.entry_date !== date);
+    const adj: DailyCashAdjustment = {
+      id: generateUUID(),
+      company_id: cid,
+      entry_date: date,
+      amount,
+      note,
+      created_by: this.currentSession?.user.id,
+      created_at: new Date().toISOString()
+    };
     
-    return list.map((j) => {
-      const staff = this.profiles.find((p) => p.id === j.staff_id);
-      const cust = j.customer_id ? this.customers.find((c) => c.id === j.customer_id) : null;
-      return {
-        ...j,
-        staff_name: staff?.full_name || 'Staff',
-        customer_name: cust?.name,
-      };
-    });
+    this.cashAdjustments.unshift(adj);
+    
+    if (supabase) {
+      supabase.from('daily_cash_adjustments').insert(adj).then(({ error }) => {
+        if (error) console.error('Error adding daily cash adjustment:', error);
+      });
+    }
+    
+    return { success: true };
+  }
+
+  public deleteDailyCashAdjustment(id: string): { success: boolean; error?: string } {
+    this.cashAdjustments = this.cashAdjustments.filter(a => a.id !== id);
+    if (supabase) {
+      supabase.from('daily_cash_adjustments').delete().eq('id', id).then(({ error }) => {
+        if (error) console.error('Error deleting daily cash adjustment:', error);
+      });
+    }
+    return { success: true };
   }
 
   public addJob(data: {
@@ -1577,21 +1610,11 @@ export class DataProvider {
 
     const old = { ...job };
     job.is_paid = isPaid;
-    
-    let paymentDateUpdate: { payment_date?: string | null } = {};
-    if (isPaid) {
-      const company = this.companies.find((c) => c.id === job.company_id);
-      job.payment_date = getTodayString(company?.timezone);
-      paymentDateUpdate.payment_date = job.payment_date;
-    } else {
-      job.payment_date = undefined;
-      paymentDateUpdate.payment_date = null;
-    }
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
     if (supabase && !forceLocal) {
-      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid, ...paymentDateUpdate }).eq('id', id);
+      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
       if (error) {
         console.error('Supabase setJobPaymentStatus error:', error.message);
         const isConstraint =

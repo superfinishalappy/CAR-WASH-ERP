@@ -48,6 +48,16 @@ export interface Customer {
   status?: 'ok' | 'near_limit' | 'over_limit';
 }
 
+export interface DailyCashAdjustment {
+  id: string;
+  company_id: string;
+  entry_date: string;
+  amount: number;
+  note?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 export interface Job {
   id: string;
   company_id: string;

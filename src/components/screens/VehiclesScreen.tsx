@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { dataProvider } from '@/lib/data-provider';
-import { Job, Profile, Customer } from '@/types/database';
+import { Job, Profile, Customer, DailyCashAdjustment } from '@/types/database';
 import {
   Car,
   Plus,
@@ -41,8 +41,11 @@ export function VehiclesScreen() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [pastCollectedJobs, setPastCollectedJobs] = useState<Job[]>([]);
-  const [pastCashCollected, setPastCashCollected] = useState<number>(0);
+  const [cashAdjustments, setCashAdjustments] = useState<DailyCashAdjustment[]>([]);
+  const pastCashCollected = cashAdjustments.reduce((sum, a) => sum + a.amount, 0);
+
+  const [newAdjustmentAmount, setNewAdjustmentAmount] = useState('');
+  const [newAdjustmentNote, setNewAdjustmentNote] = useState('');
   const [activeBatches, setActiveBatches] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
@@ -93,8 +96,7 @@ export function VehiclesScreen() {
   useEffect(() => {
     const j = dataProvider.getJobs(selectedDate);
     setJobs(j);
-    setPastCashCollected(dataProvider.getPastCashCollected(selectedDate));
-    setPastCollectedJobs(dataProvider.getPastCashCollectedJobs(selectedDate));
+    setCashAdjustments(dataProvider.getDailyCashAdjustments(selectedDate));
     
     const batches = dataProvider.getActiveBatches();
     setActiveBatches(batches);
@@ -255,6 +257,34 @@ export function VehiclesScreen() {
   }, [jobs, searchTerm]);
 
   const paginatedJobs = filteredJobs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const handleAddAdjustment = () => {
+    const amt = parseFloat(newAdjustmentAmount);
+    if (!amt || isNaN(amt) || amt <= 0) {
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+    const res = dataProvider.addDailyCashAdjustment(selectedDate, amt, newAdjustmentNote.trim());
+    if (res.success) {
+      setNewAdjustmentAmount('');
+      setNewAdjustmentNote('');
+      triggerRefresh();
+      showToast('Adjustment added', 'success');
+    } else {
+      showToast(res.error || 'Failed to add', 'error');
+    }
+  };
+
+  const handleDeleteAdjustment = (id: string) => {
+    if (!confirm('Are you sure you want to delete this cash adjustment?')) return;
+    const res = dataProvider.deleteDailyCashAdjustment(id);
+    if (res.success) {
+      triggerRefresh();
+      showToast('Adjustment deleted', 'success');
+    } else {
+      showToast(res.error || 'Failed to delete', 'error');
+    }
+  };
 
   const handleAddJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -510,13 +540,8 @@ export function VehiclesScreen() {
   const totalRev = jobs.reduce((sum, j) => sum + j.total, 0);
   const totalBase = jobs.reduce((sum, j) => sum + (j.price || 0), 0);
   const totalExtra = jobs.reduce((sum, j) => sum + (j.extra_amount || 0), 0);
-  const paidRev = jobs
-    .filter((j) => j.is_paid && (!j.payment_date || j.payment_date === selectedDate))
-    .reduce((sum, j) => sum + j.total, 0);
-
-  const unpaidRev = jobs
-    .filter((j) => !j.is_paid || (j.payment_date && j.payment_date !== selectedDate))
-    .reduce((sum, j) => sum + j.total, 0);
+  const paidRev = jobs.filter((j) => j.is_paid).reduce((sum, j) => sum + j.total, 0);
+  const unpaidRev = jobs.filter((j) => !j.is_paid).reduce((sum, j) => sum + j.total, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -625,29 +650,67 @@ export function VehiclesScreen() {
       )}
 
       {/* Past Debts Collected Mini-Table */}
-      {pastCollectedJobs.length > 0 && (
-        <div className="bg-fuchsia-50/50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 rounded-3xl p-4 shadow-sm backdrop-blur-md">
-          <div className="flex items-center gap-2 mb-3">
+      {/* Manual Cash Adjustments */}
+      <div className="bg-fuchsia-50/50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 rounded-3xl p-4 shadow-sm backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400" />
             <h2 className="text-xs font-bold text-fuchsia-800 dark:text-fuchsia-300 uppercase tracking-wider">
-              Past Debts Collected Today ({pastCollectedJobs.length})
+              Past Debts & Extra Cash Received
             </h2>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              placeholder={`Amount (${currency})`}
+              className="w-32 bg-white dark:bg-slate-900 border-fuchsia-200 dark:border-fuchsia-800/50 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-all shadow-sm"
+              value={newAdjustmentAmount}
+              onChange={(e) => setNewAdjustmentAmount(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Note (e.g. John paid 3 cars)"
+              className="flex-1 min-w-[150px] bg-white dark:bg-slate-900 border-fuchsia-200 dark:border-fuchsia-800/50 rounded-xl px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-all shadow-sm"
+              value={newAdjustmentNote}
+              onChange={(e) => setNewAdjustmentNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newAdjustmentAmount) {
+                  handleAddAdjustment();
+                }
+              }}
+            />
+            <button
+              onClick={handleAddAdjustment}
+              disabled={!newAdjustmentAmount}
+              className="bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-fuchsia-300 text-white p-1.5 rounded-xl shadow-sm transition-all"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {cashAdjustments.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {pastCollectedJobs.map((j) => (
-              <div key={j.id} className="bg-white dark:bg-slate-900 border border-fuchsia-100 dark:border-fuchsia-800/40 p-3 rounded-xl flex items-center justify-between shadow-sm">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{j.plate || j.work_type}</div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Washed: {j.entry_date}</div>
+            {cashAdjustments.map((a) => (
+              <div key={a.id} className="bg-white dark:bg-slate-900 border border-fuchsia-100 dark:border-fuchsia-800/40 p-3 rounded-xl flex items-center justify-between shadow-sm group">
+                <div className="flex-1 truncate pr-2">
+                  <div className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-400">
+                    +{a.amount.toFixed(2)} <span className="text-[10px] font-normal">{currency}</span>
+                  </div>
+                  {a.note && <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{a.note}</div>}
                 </div>
-                <div className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-400">
-                  {j.total.toFixed(2)} <span className="text-[10px] font-normal">{currency}</span>
-                </div>
+                <button
+                  onClick={() => handleDeleteAdjustment(a.id)}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Fast Cashier Entry Form Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">
