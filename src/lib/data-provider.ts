@@ -1803,7 +1803,7 @@ export class DataProvider {
       supabase.from('expenses').delete().eq('id', id).then(({ error }) => {
         this.handleSupabaseError(error, 'Error deleting expense', () => {
           this.expenses.unshift(expense);
-          this.expenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          this.expenses.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
         });
       });
     }
@@ -1889,7 +1889,7 @@ export class DataProvider {
       supabase.from('advances').delete().eq('id', id).then(({ error }) => {
         this.handleSupabaseError(error, 'Error deleting advance', () => {
           this.advances.unshift(advance);
-          this.advances.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          this.advances.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
         });
       });
     }
