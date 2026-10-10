@@ -1331,12 +1331,12 @@ export class DataProvider {
     return this.cashAdjustments.filter((a) => a.company_id === cid && a.entry_date === date);
   }
 
-  public addDailyCashAdjustment(
+  public async addDailyCashAdjustment(
     date: string,
     amount: number,
     note?: string,
     companyId?: string
-  ): { success: boolean; error?: string } {
+  ): Promise<{ success: boolean; error?: string }> {
     const cid = companyId || this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'Company ID required' };
     
@@ -1350,24 +1350,27 @@ export class DataProvider {
       created_at: new Date().toISOString()
     };
     
-    this.cashAdjustments.unshift(adj);
-    
     if (supabase) {
-      supabase.from('daily_cash_adjustments').insert(adj).then(({ error }) => {
-        if (error) console.error('Error adding daily cash adjustment:', error);
-      });
+      const { error } = await supabase.from('daily_cash_adjustments').insert(adj);
+      if (error) {
+        console.error('Error adding daily cash adjustment:', error);
+        return { success: false, error: error.message };
+      }
     }
     
+    this.cashAdjustments.unshift(adj);
     return { success: true };
   }
 
-  public deleteDailyCashAdjustment(id: string): { success: boolean; error?: string } {
-    this.cashAdjustments = this.cashAdjustments.filter(a => a.id !== id);
+  public async deleteDailyCashAdjustment(id: string): Promise<{ success: boolean; error?: string }> {
     if (supabase) {
-      supabase.from('daily_cash_adjustments').delete().eq('id', id).then(({ error }) => {
-        if (error) console.error('Error deleting daily cash adjustment:', error);
-      });
+      const { error } = await supabase.from('daily_cash_adjustments').delete().eq('id', id);
+      if (error) {
+        console.error('Error deleting daily cash adjustment:', error);
+        return { success: false, error: error.message };
+      }
     }
+    this.cashAdjustments = this.cashAdjustments.filter(a => a.id !== id);
     return { success: true };
   }
 

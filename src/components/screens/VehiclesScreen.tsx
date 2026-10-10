@@ -258,13 +258,13 @@ export function VehiclesScreen() {
 
   const paginatedJobs = filteredJobs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const handleAddAdjustment = () => {
+  const handleAddAdjustment = async () => {
     const amt = parseFloat(newAdjustmentAmount);
     if (!amt || isNaN(amt) || amt <= 0) {
       showToast('Please enter a valid amount', 'error');
       return;
     }
-    const res = dataProvider.addDailyCashAdjustment(selectedDate, amt, newAdjustmentNote.trim());
+    const res = await dataProvider.addDailyCashAdjustment(selectedDate, amt, newAdjustmentNote.trim());
     if (res.success) {
       setNewAdjustmentAmount('');
       setNewAdjustmentNote('');
@@ -275,9 +275,9 @@ export function VehiclesScreen() {
     }
   };
 
-  const handleDeleteAdjustment = (id: string) => {
+  const handleDeleteAdjustment = async (id: string) => {
     if (!confirm('Are you sure you want to delete this cash adjustment?')) return;
-    const res = dataProvider.deleteDailyCashAdjustment(id);
+    const res = await dataProvider.deleteDailyCashAdjustment(id);
     if (res.success) {
       triggerRefresh();
       showToast('Adjustment deleted', 'success');
