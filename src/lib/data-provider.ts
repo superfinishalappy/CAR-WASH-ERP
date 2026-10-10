@@ -12,6 +12,7 @@ import {
   ReportData,
   UserSession,
   DiagnosticWarning,
+  AppRole,
   InventoryItem,
   InventoryLog,
   FixedExpense,
