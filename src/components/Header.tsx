@@ -45,7 +45,7 @@ export function Header() {
     activeTab,
     setActiveTab,
     setMobileMenuOpen,
-    triggerRefresh,
+    hardRefresh,
     t,
     currency,
   } = useApp();
@@ -303,7 +303,7 @@ export function Header() {
 
           {/* Quick Data Refresh Button */}
           <button
-            onClick={() => triggerRefresh()}
+            onClick={() => hardRefresh()}
             title="Refresh Data"
             className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 transition active:rotate-180"
           >

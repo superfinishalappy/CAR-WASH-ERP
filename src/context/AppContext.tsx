@@ -32,6 +32,7 @@ interface AppContextType {
   setActingCompany: (c: Company | null) => void;
   dataVersion: number;
   triggerRefresh: () => void;
+  hardRefresh: () => void;
   currency: string;
   setCurrency: (c: string) => Promise<void>;
   logout: () => void;
@@ -192,6 +193,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const triggerRefresh = () => {
+    setDataVersion((v) => v + 1);
+  };
+
+  const hardRefresh = () => {
     dataProvider.syncFromSupabase().finally(() => {
       setDataVersion((v) => v + 1);
     });
@@ -254,6 +259,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActingCompany,
         dataVersion,
         triggerRefresh,
+        hardRefresh,
         currency,
         setCurrency,
         logout,
