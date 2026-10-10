@@ -2048,7 +2048,7 @@ export class DataProvider {
       if (supabase) {
         supabase.from('attendance').update({ status }).eq('id', existing.id).then(({ error }) => {
           this.handleSupabaseError(error, 'Error updating attendance', () => {
-            existing.status = oldStatus;
+            existing.status = old.status;
           });
         });
       }
