@@ -2253,8 +2253,9 @@ export class DataProvider {
     const prevStartStr = getLocalDateString(prevStart);
     const prevEndStr = getLocalDateString(prevEnd);
 
-    // Filter period expenses
+    // Filter period expenses and advances
     const pExpenses = this.expenses.filter((e) => e.company_id === cid && e.entry_date >= startDate && e.entry_date <= endDate);
+    const pAdvances = this.advances.filter((a) => a.company_id === cid && a.entry_date >= startDate && a.entry_date <= endDate);
     // Operating Expenses (OPEX): All operational expenses (supplies, utilities, chemicals, etc.) EXCLUDING 'Staff Salary' payouts
     // This prevents salary from being double-deducted alongside totalSalary payroll!
     const operatingExpenses = pExpenses.filter((e) => e.category !== 'Staff Salary').reduce((sum, e) => sum + e.amount, 0);
@@ -2616,10 +2617,16 @@ export class DataProvider {
 
     // 1. Operating and logged expenses (including any staff salary payouts) for that day
     for (const e of pExpenses) {
-      if (dailyMap[e.entry_date]) {
-        dailyMap[e.entry_date].expenses += e.amount;
+        if (dailyMap[e.entry_date]) {
+          dailyMap[e.entry_date].expenses += e.amount;
+        }
       }
-    }
+
+      for (const a of pAdvances) {
+        if (dailyMap[a.entry_date]) {
+          dailyMap[a.entry_date].expenses += a.amount;
+        }
+      }
 
     // 2. For dates where no explicit Staff Salary payout was recorded in expenses, add daily earned commission & wages
     const staffSalaryPaidDates = new Set(
