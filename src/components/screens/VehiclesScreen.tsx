@@ -510,8 +510,13 @@ export function VehiclesScreen() {
   const totalRev = jobs.reduce((sum, j) => sum + j.total, 0);
   const totalBase = jobs.reduce((sum, j) => sum + (j.price || 0), 0);
   const totalExtra = jobs.reduce((sum, j) => sum + (j.extra_amount || 0), 0);
-  const paidRev = jobs.filter((j) => j.is_paid).reduce((sum, j) => sum + j.total, 0);
-  const unpaidRev = jobs.filter((j) => !j.is_paid).reduce((sum, j) => sum + j.total, 0);
+  const paidRev = jobs
+    .filter((j) => j.is_paid && (!j.payment_date || j.payment_date === selectedDate))
+    .reduce((sum, j) => sum + j.total, 0);
+
+  const unpaidRev = jobs
+    .filter((j) => !j.is_paid || (j.payment_date && j.payment_date !== selectedDate))
+    .reduce((sum, j) => sum + j.total, 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
