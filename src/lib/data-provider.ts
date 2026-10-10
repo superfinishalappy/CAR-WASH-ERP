@@ -1311,6 +1311,15 @@ export class DataProvider {
     });
   }
 
+  public getPastCashCollected(date: string, companyId?: string): number {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return 0;
+    
+    return this.jobs
+      .filter((j) => j.company_id === cid && j.payment_date === date && j.entry_date !== date)
+      .reduce((sum, j) => sum + j.total, 0);
+  }
+
   public addJob(data: {
     entry_date: string;
     plate?: string;
@@ -1551,11 +1560,21 @@ export class DataProvider {
 
     const old = { ...job };
     job.is_paid = isPaid;
+    
+    let paymentDateUpdate: { payment_date?: string | null } = {};
+    if (isPaid) {
+      const company = this.companies.find((c) => c.id === job.company_id);
+      job.payment_date = getTodayString(company?.timezone);
+      paymentDateUpdate.payment_date = job.payment_date;
+    } else {
+      job.payment_date = undefined;
+      paymentDateUpdate.payment_date = null;
+    }
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
     if (supabase && !forceLocal) {
-      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
+      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid, ...paymentDateUpdate }).eq('id', id);
       if (error) {
         console.error('Supabase setJobPaymentStatus error:', error.message);
         const isConstraint =
@@ -1568,6 +1587,7 @@ export class DataProvider {
           errMsg = 'Database constraint "jobs_check" blocked this. Run in Supabase SQL Editor: ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_check;';
         }
         job.is_paid = old.is_paid;
+        job.payment_date = old.payment_date;
         return {
           success: false,
           error: errMsg,

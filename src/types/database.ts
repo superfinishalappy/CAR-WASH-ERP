@@ -62,6 +62,7 @@ export interface Job {
   total: number;
   customer_id: string | null;
   is_paid: boolean;
+  payment_date?: string;
   photo_url?: string;
   commission_rate?: number;
   commission_amount?: number;
