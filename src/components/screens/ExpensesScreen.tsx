@@ -153,7 +153,7 @@ export function ExpensesScreen() {
 
     // Staff Advances
     const totalAdvances = filteredAdvances.reduce((sum, a) => sum + a.amount, 0);
-    if (totalAdvances > 0) acc['Staff Advances'] = totalAdvances;
+    if (totalAdvances > 0) acc['Staff Salary'] = (acc['Staff Salary'] || 0) + totalAdvances;
 
     // Inventory Purchases
     const totalInventory = filteredInventoryPurchases.reduce((sum, log) => sum + (log.total_cost || 0), 0);
@@ -405,7 +405,7 @@ export function ExpensesScreen() {
                 <span className="font-bold uppercase tracking-wider text-xs">Combined Outflow</span>
               </div>
               <div className="text-3xl font-black text-rose-600">{currency} {(filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + fixedExpenses.reduce((sum, e) => sum + e.amount, 0) + filteredAdvances.reduce((sum, a) => sum + a.amount, 0) + filteredInventoryPurchases.reduce((sum, log) => sum + (log.total_cost || 0), 0)).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-              <div className="text-sm mt-2 font-medium text-slate-500">Includes {currency} {filteredAdvances.reduce((sum, a) => sum + a.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} in staff advances</div>
+              <div className="text-sm mt-2 font-medium text-slate-500">Includes {currency} {filteredAdvances.reduce((sum, a) => sum + a.amount, 0).toLocaleString(undefined, {minimumFractionDigits: 2})} from advances</div>
             </div>
           </div>
 
