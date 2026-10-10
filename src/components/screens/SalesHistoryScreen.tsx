@@ -153,7 +153,8 @@ export function SalesHistoryScreen() {
         const matchesCustomer = (job.customer_name || '').toLowerCase().includes(q);
         const matchesStaff = (job.staff_name || '').toLowerCase().includes(q);
         const matchesWork = (job.work_type || '').toLowerCase().includes(q);
-        if (!matchesPlate && !matchesMobile && !matchesCustomer && !matchesStaff && !matchesWork) {
+        const matchesVehicle = (job.vehicle_type || '').toLowerCase().includes(q);
+        if (!matchesPlate && !matchesMobile && !matchesCustomer && !matchesStaff && !matchesWork && !matchesVehicle) {
           return false;
         }
       }
@@ -591,7 +592,7 @@ export function SalesHistoryScreen() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search plate, phone, name..."
+              placeholder="Search plate, phone, vehicle, name..."
               className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-900"
             />
             {searchTerm && (
