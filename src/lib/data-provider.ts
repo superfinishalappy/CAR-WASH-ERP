@@ -105,6 +105,18 @@ export class DataProvider {
   /**
    * Sync all live database entities directly from Supabase tables
    */
+    private handleSupabaseError(error: any, fallbackMessage: string, revertFn?: () => void) {
+    if (error) {
+      console.error(fallbackMessage, error);
+      if (revertFn) revertFn();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('app-sync-error', { detail: { message: `${fallbackMessage}: ${error.message}` } })
+        );
+      }
+    }
+  }
+
   public async syncFromSupabase(): Promise<void> {
     if (!supabase) return;
 
@@ -1788,7 +1800,12 @@ export class DataProvider {
     this.logAudit('expenses', id, 'DELETE', old, null);
 
     if (supabase) {
-      supabase.from('expenses').delete().eq('id', id).then(() => {});
+      supabase.from('expenses').delete().eq('id', id).then(({ error }) => {
+        this.handleSupabaseError(error, 'Error deleting expense', () => {
+          this.expenses.unshift(expense);
+          this.expenses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        });
+      });
     }
 
     return { success: true };
@@ -1869,7 +1886,12 @@ export class DataProvider {
     this.logAudit('advances', id, 'DELETE', old, null);
 
     if (supabase) {
-      supabase.from('advances').delete().eq('id', id).then(() => {});
+      supabase.from('advances').delete().eq('id', id).then(({ error }) => {
+        this.handleSupabaseError(error, 'Error deleting advance', () => {
+          this.advances.unshift(advance);
+          this.advances.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        });
+      });
     }
 
     return { success: true };
@@ -2024,7 +2046,11 @@ export class DataProvider {
       this.logAudit('attendance', existing.id, 'UPDATE', old, existing);
 
       if (supabase) {
-        supabase.from('attendance').update({ status }).eq('id', existing.id).then(() => {});
+        supabase.from('attendance').update({ status }).eq('id', existing.id).then(({ error }) => {
+          this.handleSupabaseError(error, 'Error updating attendance', () => {
+            existing.status = oldStatus;
+          });
+        });
       }
 
       return { success: true, attendance: existing };
