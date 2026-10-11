@@ -1506,7 +1506,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const price = Number(data.price) || 0;
     const extra = Number(data.extra_amount) || 0;
     const total = price + extra;
-    const isPaid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
+    const isPaid = data.is_paid !== undefined ? Boolean(data.is_paid) : false;
 
     const staff = this.profiles.find((p) => p.id === data.staff_id);
     const commRate = staff && staff.pay_type === 'commission' ? Number(staff.pay_rate) || 0 : undefined;

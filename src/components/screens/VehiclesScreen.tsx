@@ -82,7 +82,7 @@ export function VehiclesScreen() {
   const [price, setPrice] = useState('');
   const [extraAmount, setExtraAmount] = useState('');
   const [customerId, setCustomerId] = useState<string>('');
-  const [isPaid, setIsPaid] = useState<boolean>(true); // Walk-ins default to Paid (Cash)
+  const [isPaid, setIsPaid] = useState<boolean>(false); // All vehicles default to Unpaid
   const [searchTerm, setSearchTerm] = useState('');
   const [isScanningPlate, setIsScanningPlate] = useState(false);
   // Photo handling state
@@ -352,7 +352,7 @@ export function VehiclesScreen() {
         setPrice('');
         setExtraAmount('');
         setCustomerId('');
-        setIsPaid(true); // Reset to Paid for next walk-in
+        setIsPaid(false); // Reset to Unpaid by default
         setPhotoFile(null);
         setPhotoPreview(null);
         triggerRefresh();
@@ -912,11 +912,7 @@ export function VehiclesScreen() {
               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">{t.vehicles.customerAccount}</label>
               <select
                 value={customerId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCustomerId(val);
-                  setIsPaid(val ? false : true);
-                }}
+                onChange={(e) => setCustomerId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-950 focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Walk-in Customer --</option>
