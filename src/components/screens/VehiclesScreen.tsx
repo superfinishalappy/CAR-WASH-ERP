@@ -41,14 +41,9 @@ export function VehiclesScreen() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [cashAdjustments, setCashAdjustments] = useState<DailyCashAdjustment[]>([]);
   const [jobsPaidOnSelectedDate, setJobsPaidOnSelectedDate] = useState<Job[]>([]);
-  const pastCashCollected = cashAdjustments.reduce((sum, a) => sum + a.amount, 0);
   const [dailyExpenses, setDailyExpenses] = useState<number>(0);
   const [dailyNetAdvances, setDailyNetAdvances] = useState<number>(0);
-
-  const [newAdjustmentAmount, setNewAdjustmentAmount] = useState('');
-  const [newAdjustmentNote, setNewAdjustmentNote] = useState('');
   const [activeBatches, setActiveBatches] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 50;
@@ -100,7 +95,6 @@ export function VehiclesScreen() {
     const j = dataProvider.getJobs(selectedDate);
     setJobs(j);
     setJobsPaidOnSelectedDate(dataProvider.getJobsPaidOnDate(selectedDate));
-    setCashAdjustments(dataProvider.getDailyCashAdjustments(selectedDate));
 
     const expList = dataProvider.getExpenses().filter((e) => e.entry_date === selectedDate);
     setDailyExpenses(expList.reduce((sum, e) => sum + e.amount, 0));
@@ -267,34 +261,6 @@ export function VehiclesScreen() {
   }, [jobs, searchTerm]);
 
   const paginatedJobs = filteredJobs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-  const handleAddAdjustment = async () => {
-    const amt = parseFloat(newAdjustmentAmount);
-    if (!amt || isNaN(amt) || amt <= 0) {
-      showToast('Please enter a valid amount', 'error');
-      return;
-    }
-    const res = await dataProvider.addDailyCashAdjustment(selectedDate, amt, newAdjustmentNote.trim());
-    if (res.success) {
-      setNewAdjustmentAmount('');
-      setNewAdjustmentNote('');
-      triggerRefresh();
-      showToast('Adjustment added', 'success');
-    } else {
-      showToast(res.error || 'Failed to add', 'error');
-    }
-  };
-
-  const handleDeleteAdjustment = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this cash adjustment?')) return;
-    const res = await dataProvider.deleteDailyCashAdjustment(id);
-    if (res.success) {
-      triggerRefresh();
-      showToast('Adjustment deleted', 'success');
-    } else {
-      showToast(res.error || 'Failed to delete', 'error');
-    }
-  };
 
   const handleAddJob = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -553,14 +519,14 @@ export function VehiclesScreen() {
   // Vehicles washed today and paid (for service revenue tracking)
   const paidRev = jobs.filter((j) => j.is_paid).reduce((sum, j) => sum + j.total, 0);
   const unpaidRev = jobs.filter((j) => !j.is_paid).reduce((sum, j) => sum + j.total, 0);
-  // Cash actually collected and deposited into the physical drawer today:
-  // Today's paid jobs + Prior-day jobs paid today + Manual cash adjustments/debts
+  // Cash actually collected and deposited into the physical drawer on this date:
+  // (Jobs washed today & paid + Past jobs washed earlier but paid on this date)
   const actualJobCashCollectedToday = jobsPaidOnSelectedDate.reduce((sum, j) => sum + j.total, 0);
-  // Separate same-day cash vs prior-day debts recovered today
+  // Prior-day jobs recovered/paid on this date
   const lateJobsCollectedToday = jobsPaidOnSelectedDate.filter((j) => j.entry_date !== selectedDate);
   const lateJobCashCollectedToday = lateJobsCollectedToday.reduce((sum, j) => sum + j.total, 0);
 
-  const totalDrawerIn = actualJobCashCollectedToday + pastCashCollected;
+  const totalDrawerIn = actualJobCashCollectedToday;
   const totalDrawerOut = dailyExpenses + dailyNetAdvances;
   const cashInDrawer = totalDrawerIn - totalDrawerOut;
 
@@ -646,13 +612,13 @@ export function VehiclesScreen() {
             </div>
             <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Paid for Today's Jobs</div>
           </div>
-          <div className="p-3.5 rounded-2xl bg-fuchsia-50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-fuchsia-700 dark:text-fuchsia-400 font-medium">Past Cash</div>
-            <div className="text-xl font-bold text-fuchsia-800 dark:text-fuchsia-300 mt-1">
-              {(pastCashCollected + lateJobCashCollectedToday).toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+          <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
+            <div className="text-xs text-purple-700 dark:text-purple-400 font-medium">Old Jobs Paid Today</div>
+            <div className="text-xl font-bold text-purple-800 dark:text-purple-300 mt-1">
+              {lateJobCashCollectedToday.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
             </div>
-            <div className="text-[10px] text-fuchsia-600/80 dark:text-fuchsia-400/80">
-              {lateJobCashCollectedToday > 0 ? `Debts: ${pastCashCollected.toFixed(2)} + Old Jobs: ${lateJobCashCollectedToday.toFixed(2)}` : 'Past Debts & Old Jobs Paid'}
+            <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80">
+              {lateJobsCollectedToday.length} past vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'} collected
             </div>
           </div>
           <div className="col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
@@ -681,69 +647,6 @@ export function VehiclesScreen() {
           </div>
         </div>
       )}
-
-      {/* Past Debts Collected Mini-Table */}
-      {/* Manual Cash Adjustments */}
-      <div className="bg-fuchsia-50/50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 rounded-3xl p-4 shadow-sm backdrop-blur-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400" />
-            <h2 className="text-xs font-bold text-fuchsia-800 dark:text-fuchsia-300 uppercase tracking-wider">
-              Past Debts & Extra Cash Received
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min="0"
-              placeholder={`Amount (${currency})`}
-              className="w-32 bg-white dark:bg-slate-900 border-fuchsia-200 dark:border-fuchsia-800/50 rounded-xl px-3 py-1.5 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-all shadow-sm"
-              value={newAdjustmentAmount}
-              onChange={(e) => setNewAdjustmentAmount(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Note (e.g. John paid 3 cars)"
-              className="flex-1 min-w-[150px] bg-white dark:bg-slate-900 border-fuchsia-200 dark:border-fuchsia-800/50 rounded-xl px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-all shadow-sm"
-              value={newAdjustmentNote}
-              onChange={(e) => setNewAdjustmentNote(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newAdjustmentAmount) {
-                  handleAddAdjustment();
-                }
-              }}
-            />
-            <button
-              onClick={handleAddAdjustment}
-              disabled={!newAdjustmentAmount}
-              className="bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-fuchsia-300 text-white p-1.5 rounded-xl shadow-sm transition-all"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {cashAdjustments.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {cashAdjustments.map((a) => (
-              <div key={a.id} className="bg-white dark:bg-slate-900 border border-fuchsia-100 dark:border-fuchsia-800/40 p-3 rounded-xl flex items-center justify-between shadow-sm group">
-                <div className="flex-1 truncate pr-2">
-                  <div className="text-sm font-black text-fuchsia-700 dark:text-fuchsia-400">
-                    +{a.amount.toFixed(2)} <span className="text-[10px] font-normal">{currency}</span>
-                  </div>
-                  {a.note && <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{a.note}</div>}
-                </div>
-                <button
-                  onClick={() => handleDeleteAdjustment(a.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Fast Cashier Entry Form Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">
