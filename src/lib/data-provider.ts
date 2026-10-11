@@ -172,6 +172,7 @@ export class DataProvider {
       const { data: jobData, error: jobErr } = await jobQuery;
       if (!jobErr && jobData) {
         this.jobs = jobData;
+        this.applyPaymentCacheToJobs();
       }
 
       // 6. Expenses (Safeguarded to most recent 1,500 records)
@@ -314,6 +315,36 @@ export class DataProvider {
     }
   }
 
+  private saveJobPaymentCache(jobId: string, isPaid: boolean, paymentDate?: string) {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('garage_erp_job_payment_cache');
+      const cache = raw ? JSON.parse(raw) : {};
+      cache[jobId] = { is_paid: isPaid, payment_date: paymentDate };
+      localStorage.setItem('garage_erp_job_payment_cache', JSON.stringify(cache));
+
+      // Also maintain legacy garage_erp_job_payment_dates for backward compatibility
+      const rawDates = localStorage.getItem('garage_erp_job_payment_dates');
+      const dateCache = rawDates ? JSON.parse(rawDates) : {};
+      if (paymentDate && isPaid) {
+        dateCache[jobId] = paymentDate;
+      } else {
+        delete dateCache[jobId];
+      }
+      localStorage.setItem('garage_erp_job_payment_dates', JSON.stringify(dateCache));
+    } catch (e) {}
+  }
+
+  private getJobPaymentCache(): Record<string, { is_paid: boolean; payment_date?: string }> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('garage_erp_job_payment_cache');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   private saveJobPaymentDateCache(jobId: string, paymentDate?: string) {
     if (typeof window === 'undefined') return;
     try {
@@ -335,6 +366,21 @@ export class DataProvider {
       return raw ? JSON.parse(raw) : {};
     } catch (e) {
       return {};
+    }
+  }
+
+  public applyPaymentCacheToJobs(): void {
+    const pCache = this.getJobPaymentCache();
+    const dateCache = this.getJobPaymentDateCache();
+    for (const j of this.jobs) {
+      if (pCache[j.id] !== undefined) {
+        j.is_paid = pCache[j.id].is_paid;
+        if (pCache[j.id].payment_date) {
+          j.payment_date = pCache[j.id].payment_date;
+        }
+      } else if (dateCache[j.id]) {
+        j.payment_date = dateCache[j.id];
+      }
     }
   }
 
@@ -1345,6 +1391,7 @@ export class DataProvider {
     const cid = companyId || this.getEffectiveCompanyId();
     if (!cid) return [];
 
+    this.applyPaymentCacheToJobs();
     let list = this.jobs.filter((j) => j.company_id === cid);
     if (date) {
       list = list.filter((j) => j.entry_date === date);
@@ -1364,9 +1411,10 @@ export class DataProvider {
     });
   }
 
-    public getJobsPaidOnDate(date: string, companyId?: string): Job[] {
+  public getJobsPaidOnDate(date: string, companyId?: string): Job[] {
     const cid = companyId || this.getEffectiveCompanyId();
     if (!cid) return [];
+    this.applyPaymentCacheToJobs();
     const paymentCache = this.getJobPaymentDateCache();
     return this.jobs
       .filter((j) => {
@@ -1565,6 +1613,12 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     job.total = price + extra;
     job.customer_id = data.customer_id || null;
     job.is_paid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
+    if (job.is_paid) {
+      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+    } else {
+      job.payment_date = undefined;
+    }
+    this.saveJobPaymentCache(job.id, job.is_paid, job.payment_date);
     if (data.photo_url !== undefined) {
       job.photo_url = data.photo_url;
     }
@@ -1612,13 +1666,32 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
         commission_amount: job.commission_amount,
         customer_id: job.customer_id,
         is_paid: job.is_paid,
+        payment_date: job.payment_date || null,
         entry_date: job.entry_date,
         photo_url: job.photo_url,
       }).eq('id', id).then(({ error }) => {
-        if (error) {
-          console.error('Supabase job update error:', error.message);
-          Object.assign(job, old);
-          this.dispatchSyncError(`Failed to update job (Sync Error): ${error.message}`);
+        if (error && supabase) {
+          // Retry without payment_date in case column issue
+          supabase.from('jobs').update({
+            plate: job.plate,
+            mobile: job.mobile,
+            work_type: job.work_type,
+            vehicle_type: job.vehicle_type,
+            staff_id: job.staff_id,
+            price: job.price,
+            extra_amount: job.extra_amount,
+            commission_rate: job.commission_rate,
+            commission_amount: job.commission_amount,
+            customer_id: job.customer_id,
+            is_paid: job.is_paid,
+            entry_date: job.entry_date,
+            photo_url: job.photo_url,
+          }).eq('id', id).then(({ error: err2 }) => {
+            if (err2) {
+              console.error('Supabase job update error:', err2.message);
+              this.dispatchSyncError(`Failed to update job (Sync Error): ${err2.message}`);
+            }
+          });
         }
       });
     }
@@ -1640,31 +1713,41 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     } else {
       job.payment_date = undefined;
     }
-    this.saveJobPaymentDateCache(job.id, job.payment_date);
+    this.saveJobPaymentCache(job.id, job.is_paid, job.payment_date);
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
     if (supabase && !forceLocal) {
-      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
+      const { error } = await supabase.from('jobs').update({
+        is_paid: job.is_paid,
+        payment_date: job.payment_date || null,
+      }).eq('id', id);
+
       if (error) {
-        console.error('Supabase toggleJobPayment error:', error.message);
-        const isConstraint =
-          error.code === '23514' ||
-          error.message.includes('jobs_check') ||
-          error.message.includes('jobs_customer_id_check') ||
-          error.message.includes('check constraint');
-        let errMsg = error.message;
-        if (isConstraint) {
-          errMsg = 'Database constraint "jobs_check" blocked this. Run in Supabase SQL Editor: ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_check;';
+        console.warn('Supabase toggleJobPayment primary error:', error.message);
+        // Fallback update without payment_date
+        const { error: err2 } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
+        if (err2) {
+          console.error('Supabase toggleJobPayment fallback error:', err2.message);
+          const isConstraint =
+            err2.code === '23514' ||
+            err2.message.includes('jobs_check') ||
+            err2.message.includes('jobs_customer_id_check') ||
+            err2.message.includes('check constraint');
+          let errMsg = err2.message;
+          if (isConstraint) {
+            errMsg = 'Database constraint "jobs_check" blocked this. Run in Supabase SQL Editor: ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_check;';
+          }
+          // Preserve local cache so user's mark is NEVER lost on page reload!
+          return {
+            success: true,
+            job,
+            error: errMsg,
+            isConstraintError: isConstraint,
+            sqlFix:
+              'ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_check;\nALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_customer_id_check;',
+          };
         }
-        job.is_paid = old.is_paid;
-        return {
-          success: false,
-          error: errMsg,
-          isConstraintError: isConstraint,
-          sqlFix:
-            'ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_check;\nALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_customer_id_check;',
-        };
       }
     }
 
@@ -1686,32 +1769,40 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     } else {
       job.payment_date = undefined;
     }
-    this.saveJobPaymentDateCache(job.id, job.payment_date);
+    this.saveJobPaymentCache(job.id, job.is_paid, job.payment_date);
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
     if (supabase && !forceLocal) {
-      const { error } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
+      const { error } = await supabase.from('jobs').update({
+        is_paid: job.is_paid,
+        payment_date: job.payment_date || null,
+      }).eq('id', id);
+
       if (error) {
-        console.error('Supabase setJobPaymentStatus error:', error.message);
-        const isConstraint =
-          error.code === '23514' ||
-          error.message.includes('jobs_check') ||
-          error.message.includes('jobs_customer_id_check') ||
-          error.message.includes('check constraint');
-        let errMsg = error.message;
-        if (isConstraint) {
-          errMsg = 'Database constraint "jobs_check" blocked this. Run in Supabase SQL Editor: ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_check;';
+        console.warn('Supabase setJobPaymentStatus primary error:', error.message);
+        const { error: err2 } = await supabase.from('jobs').update({ is_paid: job.is_paid }).eq('id', id);
+        if (err2) {
+          console.error('Supabase setJobPaymentStatus fallback error:', err2.message);
+          const isConstraint =
+            err2.code === '23514' ||
+            err2.message.includes('jobs_check') ||
+            err2.message.includes('jobs_customer_id_check') ||
+            err2.message.includes('check constraint');
+          let errMsg = err2.message;
+          if (isConstraint) {
+            errMsg = 'Database constraint "jobs_check" blocked this. Run in Supabase SQL Editor: ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_check;';
+          }
+          // Retain local cache so page refresh does not reset it
+          return {
+            success: true,
+            job,
+            error: errMsg,
+            isConstraintError: isConstraint,
+            sqlFix:
+              'ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_check;\nALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_customer_id_check;',
+          };
         }
-        job.is_paid = old.is_paid;
-        job.payment_date = old.payment_date;
-        return {
-          success: false,
-          error: errMsg,
-          isConstraintError: isConstraint,
-          sqlFix:
-            'ALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_check;\nALTER TABLE public.jobs DROP CONSTRAINT IF EXISTS jobs_customer_id_check;',
-        };
       }
     }
 

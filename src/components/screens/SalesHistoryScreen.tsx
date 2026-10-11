@@ -138,9 +138,11 @@ export function SalesHistoryScreen() {
       // 4. Work Type Filter
       if (workTypeFilter !== 'all' && job.work_type !== workTypeFilter) return false;
 
-      // 5. Date Filter
+      // 5. Date Filter (Includes vehicles washed in range OR old vehicles paid in range)
       if (dateRange) {
-        if (job.entry_date < dateRange.start || job.entry_date > dateRange.end) {
+        const washedInRange = job.entry_date >= dateRange.start && job.entry_date <= dateRange.end;
+        const paidInRange = Boolean(job.is_paid && job.payment_date && job.payment_date >= dateRange.start && job.payment_date <= dateRange.end);
+        if (!washedInRange && !paidInRange) {
           return false;
         }
       }
@@ -239,9 +241,11 @@ export function SalesHistoryScreen() {
   // Quick 1-Click Toggle Paid / Unpaid Status
   const handleTogglePayment = async (job: Job) => {
     const newStatus = !job.is_paid;
+    const tz = session?.company?.timezone;
+    const todayStr = getTodayString(tz);
     // Optimistic local update for instant feedback
     setJobs((prev) =>
-      prev.map((j) => (j.id === job.id ? { ...j, is_paid: newStatus } : j))
+      prev.map((j) => (j.id === job.id ? { ...j, is_paid: newStatus, payment_date: newStatus ? (j.payment_date || todayStr) : undefined } : j))
     );
 
     const res = await dataProvider.toggleJobPayment(job.id);
@@ -255,6 +259,9 @@ export function SalesHistoryScreen() {
           : `↩ Vehicle ${job.plate || job.work_type} marked as UNPAID!`,
         newStatus ? 'success' : 'info'
       );
+      if (res.isConstraintError) {
+        setConstraintModalJob(job);
+      }
       triggerRefresh();
     } else {
       // Revert if error

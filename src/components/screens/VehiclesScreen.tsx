@@ -38,7 +38,24 @@ export function VehiclesScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, setActiveTab, currency } = useApp();
 
   const todayStr = getTodayString(session?.company?.timezone);
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedDate, setSelectedDateState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('garage_erp_vehicles_selected_date');
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return getTodayString(session?.company?.timezone);
+  });
+
+  const setSelectedDate = (d: string) => {
+    setSelectedDateState(d);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('garage_erp_vehicles_selected_date', d);
+      } catch (e) {}
+    }
+  };
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsPaidOnSelectedDate, setJobsPaidOnSelectedDate] = useState<Job[]>([]);
@@ -182,10 +199,11 @@ export function VehiclesScreen() {
     const newStatus = !job.is_paid;
     // Optimistic local update for instant feedback
     setJobs((prev) =>
-      prev.map((j) => (j.id === job.id ? { ...j, is_paid: newStatus } : j))
+      prev.map((j) => (j.id === job.id ? { ...j, is_paid: newStatus, payment_date: newStatus ? (j.payment_date || selectedDate) : undefined } : j))
     );
 
     const res = await dataProvider.toggleJobPayment(job.id);
+    setJobsPaidOnSelectedDate(dataProvider.getJobsPaidOnDate(selectedDate));
     if (res.success) {
       const cust = job.customer_id ? customerList.find((c) => c.id === job.customer_id) : null;
       showToast(
@@ -196,12 +214,16 @@ export function VehiclesScreen() {
           : `↩ Vehicle ${job.plate || job.work_type} marked as UNPAID!`,
         newStatus ? 'success' : 'info'
       );
+      if (res.isConstraintError) {
+        setConstraintModalJob(job);
+      }
       triggerRefresh();
     } else {
       // Revert if error
       setJobs((prev) =>
         prev.map((j) => (j.id === job.id ? { ...j, is_paid: !newStatus } : j))
       );
+      setJobsPaidOnSelectedDate(dataProvider.getJobsPaidOnDate(selectedDate));
       if (res.isConstraintError) {
         setConstraintModalJob(job);
       } else {
@@ -644,6 +666,80 @@ export function VehiclesScreen() {
             <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
               {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Past Vehicles Collected on this Date */}
+      {lateJobsCollectedToday.length > 0 && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wider flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Past Vehicles Collected on {selectedDate} ({lateJobsCollectedToday.length} vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'} · {lateJobCashCollectedToday.toFixed(2)} {currency})
+            </h3>
+            <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 px-2.5 py-0.5 rounded-full border border-purple-200 dark:border-purple-800/40">
+              Added to Drawer Cash
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left rtl:text-right text-xs">
+              <thead className="bg-purple-100/60 dark:bg-purple-900/30 text-purple-900 dark:text-purple-200 font-semibold">
+                <tr>
+                  <th className="py-2.5 px-3 rounded-l-xl">Washed Date</th>
+                  <th className="py-2.5 px-3">Plate / Mobile</th>
+                  <th className="py-2.5 px-3">Service</th>
+                  <th className="py-2.5 px-3">Staff</th>
+                  <th className="py-2.5 px-3">Amount</th>
+                  <th className="py-2.5 px-3">Payment Status</th>
+                  <th className="py-2.5 px-3 text-right rtl:text-left rounded-r-xl">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-purple-100 dark:divide-purple-900/20">
+                {lateJobsCollectedToday.map((j) => (
+                  <tr key={j.id} className="hover:bg-purple-100/30 dark:hover:bg-purple-900/20 transition">
+                    <td className="py-2.5 px-3 font-mono font-medium text-slate-700 dark:text-slate-300">
+                      {j.entry_date}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                        {j.plate || 'NO PLATE'}
+                      </span>
+                      {j.mobile && (
+                        <span className="block text-[10px] text-slate-500 font-mono">{j.mobile}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{j.work_type}</span>
+                      <span className="block text-[10px] text-slate-400">{j.vehicle_type}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                      {j.staff_name}
+                    </td>
+                    <td className="py-2.5 px-3 font-black text-slate-900 dark:text-white">
+                      {j.total.toFixed(2)} {currency}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                        ✓ Paid Late ({j.payment_date || selectedDate})
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-right rtl:text-left">
+                      <button
+                        onClick={() => handleTogglePayment(j)}
+                        className="py-1 px-2.5 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition shadow-sm inline-flex items-center gap-1"
+                        title="Click to revert to Unpaid"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Mark Unpaid</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
