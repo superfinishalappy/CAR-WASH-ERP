@@ -852,18 +852,36 @@ export function SalesHistoryScreen() {
                         {/* 7. Payment Status & Quick 1-Click Toggle */}
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            {/* Current Status Badge */}
-                            {job.is_paid ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                                PAID
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
-                                <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
-                                UNPAID
-                              </span>
-                            )}
+                            {/* Current Status Badge with Date Distinction */}
+                            {(() => {
+                              const isPaidLate = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
+                              const payDateDisplay = job.payment_date || job.entry_date;
+                              if (isPaidLate) {
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shadow-sm"
+                                    title={`Service Date: ${job.entry_date} → Paid on: ${job.payment_date}`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                                    PAID LATE ({job.payment_date})
+                                  </span>
+                                );
+                              }
+                              if (job.is_paid) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    PAID ({payDateDisplay})
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
+                                  <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                                  UNPAID
+                                </span>
+                              );
+                            })()}
 
                             {/* Quick 1-Click Toggle Button */}
                             <button
@@ -960,11 +978,18 @@ export function SalesHistoryScreen() {
                             {job.vehicle_type}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1 font-mono">
+                        <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5 font-mono flex-wrap">
                           <Clock className="w-3 h-3" />
-                          <span>{job.entry_date}</span>
-                          <span>•</span>
-                          <span>{job.created_at ? new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                          <span>Washed: {job.entry_date}</span>
+                          {job.is_paid && (
+                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                              job.payment_date && job.payment_date !== job.entry_date
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            }`}>
+                              • Paid: {job.payment_date || job.entry_date}
+                            </span>
+                          )}
                         </div>
                       </div>
 

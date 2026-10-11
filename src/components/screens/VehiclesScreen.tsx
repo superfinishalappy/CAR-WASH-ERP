@@ -42,6 +42,7 @@ export function VehiclesScreen() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [cashAdjustments, setCashAdjustments] = useState<DailyCashAdjustment[]>([]);
+  const [jobsPaidOnSelectedDate, setJobsPaidOnSelectedDate] = useState<Job[]>([]);
   const pastCashCollected = cashAdjustments.reduce((sum, a) => sum + a.amount, 0);
   const [dailyExpenses, setDailyExpenses] = useState<number>(0);
   const [dailyNetAdvances, setDailyNetAdvances] = useState<number>(0);
@@ -98,6 +99,7 @@ export function VehiclesScreen() {
   useEffect(() => {
     const j = dataProvider.getJobs(selectedDate);
     setJobs(j);
+    setJobsPaidOnSelectedDate(dataProvider.getJobsPaidOnDate(selectedDate));
     setCashAdjustments(dataProvider.getDailyCashAdjustments(selectedDate));
 
     const expList = dataProvider.getExpenses().filter((e) => e.entry_date === selectedDate);
@@ -548,9 +550,17 @@ export function VehiclesScreen() {
   const totalRev = jobs.reduce((sum, j) => sum + j.total, 0);
   const totalBase = jobs.reduce((sum, j) => sum + (j.price || 0), 0);
   const totalExtra = jobs.reduce((sum, j) => sum + (j.extra_amount || 0), 0);
+  // Vehicles washed today and paid (for service revenue tracking)
   const paidRev = jobs.filter((j) => j.is_paid).reduce((sum, j) => sum + j.total, 0);
   const unpaidRev = jobs.filter((j) => !j.is_paid).reduce((sum, j) => sum + j.total, 0);
-  const totalDrawerIn = paidRev + pastCashCollected;
+  // Cash actually collected and deposited into the physical drawer today:
+  // Today's paid jobs + Prior-day jobs paid today + Manual cash adjustments/debts
+  const actualJobCashCollectedToday = jobsPaidOnSelectedDate.reduce((sum, j) => sum + j.total, 0);
+  // Separate same-day cash vs prior-day debts recovered today
+  const lateJobsCollectedToday = jobsPaidOnSelectedDate.filter((j) => j.entry_date !== selectedDate);
+  const lateJobCashCollectedToday = lateJobsCollectedToday.reduce((sum, j) => sum + j.total, 0);
+
+  const totalDrawerIn = actualJobCashCollectedToday + pastCashCollected;
   const totalDrawerOut = dailyExpenses + dailyNetAdvances;
   const cashInDrawer = totalDrawerIn - totalDrawerOut;
 
@@ -634,14 +644,16 @@ export function VehiclesScreen() {
             <div className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
               {paidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
             </div>
-            <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Cash for Today's Work</div>
+            <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Paid for Today's Jobs</div>
           </div>
           <div className="p-3.5 rounded-2xl bg-fuchsia-50 dark:bg-fuchsia-950/20 border border-fuchsia-200 dark:border-fuchsia-800/40 shadow-sm backdrop-blur-md">
             <div className="text-xs text-fuchsia-700 dark:text-fuchsia-400 font-medium">Past Cash</div>
             <div className="text-xl font-bold text-fuchsia-800 dark:text-fuchsia-300 mt-1">
-              {pastCashCollected.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+              {(pastCashCollected + lateJobCashCollectedToday).toFixed(2)} <span className="text-xs font-normal">{currency}</span>
             </div>
-            <div className="text-[10px] text-fuchsia-600/80 dark:text-fuchsia-400/80">Past Debts Collected Today</div>
+            <div className="text-[10px] text-fuchsia-600/80 dark:text-fuchsia-400/80">
+              {lateJobCashCollectedToday > 0 ? `Debts: ${pastCashCollected.toFixed(2)} + Old Jobs: ${lateJobCashCollectedToday.toFixed(2)}` : 'Past Debts & Old Jobs Paid'}
+            </div>
           </div>
           <div className="col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
             <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
@@ -1212,19 +1224,50 @@ export function VehiclesScreen() {
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            {isCredit ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">
-                                {job.is_paid ? '✓ Paid' : 'Credit'} · {job.customer_name}
-                              </span>
-                            ) : job.is_paid ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                                ✓ Paid
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
-                                ✗ Unpaid
-                              </span>
-                            )}
+                            {(() => {
+                              const isPaidLate = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
+                              const payDateDisplay = job.payment_date || job.entry_date;
+                              if (isCredit) {
+                                return (
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                    isPaidLate
+                                      ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700/60'
+                                      : job.is_paid
+                                      ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
+                                      : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
+                                  }`}>
+                                    {isPaidLate
+                                      ? `✓ Paid Late (${payDateDisplay})`
+                                      : job.is_paid
+                                      ? `✓ Paid (${payDateDisplay})`
+                                      : 'Credit'} · {job.customer_name}
+                                  </span>
+                                );
+                              }
+                              if (isPaidLate) {
+                                return (
+                                  <span
+                                    className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 inline-flex items-center gap-1 shadow-sm"
+                                    title={`Washed on ${job.entry_date} → Paid on ${job.payment_date}`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                                    ✓ Paid Late ({job.payment_date})
+                                  </span>
+                                );
+                              }
+                              if (job.is_paid) {
+                                return (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                    ✓ Paid ({job.payment_date || job.entry_date})
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
+                                  ✗ Unpaid
+                                </span>
+                              );
+                            })()}
 
                             {/* 1-Click Toggle Paid / Unpaid Button */}
                             <button
@@ -1302,6 +1345,29 @@ export function VehiclesScreen() {
                     {/* Card Header: Plate, Vehicle Type & Actions */}
                     <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* Status Badge with Dates */}
+                        {(() => {
+                          const isPaidLate = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
+                          if (isPaidLate) {
+                            return (
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60">
+                                ✓ Paid Late (Paid: {job.payment_date})
+                              </span>
+                            );
+                          }
+                          if (job.is_paid) {
+                            return (
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                                ✓ Paid ({job.payment_date || job.entry_date})
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                              ✗ Unpaid
+                            </span>
+                          );
+                        })()}
                         {job.photo_url && (
                           <img 
                             src={job.photo_url} 

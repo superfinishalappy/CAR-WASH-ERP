@@ -314,6 +314,30 @@ export class DataProvider {
     }
   }
 
+  private saveJobPaymentDateCache(jobId: string, paymentDate?: string) {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('garage_erp_job_payment_dates');
+      const cache = raw ? JSON.parse(raw) : {};
+      if (paymentDate) {
+        cache[jobId] = paymentDate;
+      } else {
+        delete cache[jobId];
+      }
+      localStorage.setItem('garage_erp_job_payment_dates', JSON.stringify(cache));
+    } catch (e) {}
+  }
+
+  private getJobPaymentDateCache(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('garage_erp_job_payment_dates');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
   private saveJobRateCache(jobId: string, rate: number, amount: number) {
     if (typeof window === 'undefined') return;
     try {
@@ -1326,18 +1350,43 @@ export class DataProvider {
       list = list.filter((j) => j.entry_date === date);
     }
 
+    const paymentCache = this.getJobPaymentDateCache();
     return list.map((j) => {
       const staff = this.profiles.find((p) => p.id === j.staff_id);
       const cust = j.customer_id ? this.customers.find((c) => c.id === j.customer_id) : null;
+      const effectivePaymentDate = j.payment_date || paymentCache[j.id] || (j.is_paid ? j.entry_date : undefined);
       return {
         ...j,
+        payment_date: effectivePaymentDate,
         staff_name: staff?.full_name || 'Staff',
         customer_name: cust?.name,
       };
     });
   }
 
-  public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjustment[] {
+    public getJobsPaidOnDate(date: string, companyId?: string): Job[] {
+    const cid = companyId || this.getEffectiveCompanyId();
+    if (!cid) return [];
+    const paymentCache = this.getJobPaymentDateCache();
+    return this.jobs
+      .filter((j) => {
+        if (j.company_id !== cid || !j.is_paid) return false;
+        const pDate = j.payment_date || paymentCache[j.id] || j.entry_date;
+        return pDate === date;
+      })
+      .map((j) => {
+        const staff = this.profiles.find((p) => p.id === j.staff_id);
+        const cust = j.customer_id ? this.customers.find((c) => c.id === j.customer_id) : null;
+        return {
+          ...j,
+          payment_date: j.payment_date || paymentCache[j.id] || j.entry_date,
+          staff_name: staff?.full_name || 'Staff',
+          customer_name: cust?.name,
+        };
+      });
+  }
+
+public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjustment[] {
     const cid = companyId || this.getEffectiveCompanyId();
     if (!cid) return [];
     return this.cashAdjustments.filter((a) => a.company_id === cid && a.entry_date === date);
@@ -1586,6 +1635,12 @@ export class DataProvider {
 
     const old = { ...job };
     job.is_paid = !job.is_paid;
+    if (job.is_paid) {
+      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+    } else {
+      job.payment_date = undefined;
+    }
+    this.saveJobPaymentDateCache(job.id, job.payment_date);
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
@@ -1626,6 +1681,12 @@ export class DataProvider {
 
     const old = { ...job };
     job.is_paid = isPaid;
+    if (job.is_paid) {
+      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+    } else {
+      job.payment_date = undefined;
+    }
+    this.saveJobPaymentDateCache(job.id, job.payment_date);
 
     this.logAudit('jobs', job.id, 'UPDATE', old, job);
 
@@ -2761,7 +2822,14 @@ export class DataProvider {
 
     // Period Cash Flow & Physical Drawer Cash
     const pCashAdj = this.cashAdjustments.filter((a) => a.company_id === cid && a.entry_date >= startDate && a.entry_date <= endDate).reduce((sum, a) => sum + a.amount, 0);
-    const totalCashInflow = collected + pCashAdj;
+    const paymentCache = this.getJobPaymentDateCache();
+    const periodJobsPaid = this.jobs.filter((j) => {
+      if (j.company_id !== cid || !j.is_paid) return false;
+      const pDate = j.payment_date || paymentCache[j.id] || j.entry_date;
+      return pDate >= startDate && pDate <= endDate;
+    });
+    const cashCollectedInPeriod = periodJobsPaid.reduce((sum, j) => sum + j.total, 0);
+    const totalCashInflow = cashCollectedInPeriod + pCashAdj;
     const totalActualExpenses = pExpenses.reduce((sum, e) => sum + e.amount, 0);
     const netAdvancesInPeriod = pAdvances.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
     const totalCashOutflow = totalActualExpenses + netAdvancesInPeriod;
