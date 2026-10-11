@@ -1820,9 +1820,11 @@ export class DataProvider {
       .filter((a) => a.company_id === cid)
       .map((a) => {
         const staff = this.profiles.find((p) => p.id === a.staff_id);
+        const isRepayment = (a.note || '').includes('[REPAYMENT]');
         return {
           ...a,
           staff_name: staff?.full_name || 'Staff',
+          is_repayment: isRepayment,
         };
       });
   }
@@ -1833,6 +1835,7 @@ export class DataProvider {
     amount: number;
     note?: string;
     company_id?: string;
+    is_repayment?: boolean;
   }): { success: boolean; advance?: Advance; error?: string } {
     const cid = data.company_id || this.getEffectiveCompanyId();
     if (!cid) return { success: false, error: 'Company ID required' };
@@ -1841,13 +1844,18 @@ export class DataProvider {
       return { success: false, error: 'Advances for past days can only be recorded by the Owner.' };
     }
 
+    let noteText = data.note?.trim() || null;
+    if (data.is_repayment && (!noteText || !noteText.includes('[REPAYMENT]'))) {
+      noteText = noteText ? ('[REPAYMENT] ' + noteText) : '[REPAYMENT] Advance cash returned';
+    }
+
     const advance: Advance = {
       id: generateUUID(),
       company_id: cid,
       entry_date: data.entry_date,
       staff_id: data.staff_id,
       amount: Number(data.amount) || 0,
-      note: data.note?.trim() || null,
+      note: noteText,
       created_by: this.currentSession?.user.id,
       created_at: new Date().toISOString(),
     };
@@ -2316,10 +2324,10 @@ export class DataProvider {
         grossSalary = 0;
       }
 
-      // Advances in period
+      // Advances in period (disbursed minus repayments)
       const sAdv = this.advances
         .filter((a) => a.company_id === cid && a.staff_id === staff.id && a.entry_date >= startDate && a.entry_date <= endDate)
-        .reduce((sum, a) => sum + a.amount, 0);
+        .reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
 
       // Salary payouts recorded in period for this staff (expenses category 'Staff Salary')
       const sPaid = this.expenses
@@ -2335,7 +2343,7 @@ export class DataProvider {
         )
         .reduce((sum, e) => sum + e.amount, 0);
 
-      const balanceToPay = Math.max(0, Math.round((grossSalary - sAdv - sPaid) * 100) / 100);
+      const balanceToPay = Math.round((grossSalary - sAdv - sPaid) * 100) / 100;
 
       totalSalary += grossSalary;
       totalAdvances += sAdv;
@@ -2624,7 +2632,8 @@ export class DataProvider {
 
       for (const a of pAdvances) {
         if (dailyMap[a.entry_date]) {
-          dailyMap[a.entry_date].expenses += a.amount;
+          const isRepayment = (a.note || '').includes('[REPAYMENT]');
+          dailyMap[a.entry_date].expenses += isRepayment ? -a.amount : a.amount;
         }
       }
 
