@@ -159,6 +159,7 @@ export function ReportsScreen() {
       { Metric: 'Net Profit', Value: report.kpis.net_profit },
       { Metric: 'Net Margin (%)', Value: `${(report.kpis.net_margin * 100).toFixed(1)}%` },
       { Metric: 'Cash Profit', Value: report.kpis.cash_profit },
+      { Metric: 'Cash in Drawer', Value: report.kpis.drawer_cash ?? 0 },
       { Metric: 'Health Score', Value: `${report.health.score} (${report.health.status})` },
     ];
     exportToCSV(`Garage_Report_${startDate}_to_${endDate}`, kpisRow);
@@ -182,6 +183,7 @@ export function ReportsScreen() {
           { Metric: 'Total Staff Payroll', Value: report.kpis.total_salary },
           { Metric: 'Net Profit', Value: report.kpis.net_profit },
           { Metric: 'Cash Profit', Value: report.kpis.cash_profit },
+          { Metric: 'Cash in Drawer', Value: report.kpis.drawer_cash ?? 0 },
           { Metric: 'Health Score', Value: report.health.score },
         ],
       },
@@ -571,7 +573,21 @@ export function ReportsScreen() {
           <div className="text-[10px] text-slate-500 mt-1">Collected - OPEX - Payroll</div>
         </div>
 
-        {/* 12. Health Score */}
+                {/* 12. Cash in Drawer (Physical Box) */}
+        <div className="p-4 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-600 border border-emerald-700 shadow-sm dark:shadow-xl text-white flex flex-col justify-between">
+          <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /> Cash in Drawer</span>
+            <span className="text-[10px] bg-emerald-700/60 px-2 py-0.5 rounded-full border border-emerald-500/30 font-medium">Net Box</span>
+          </div>
+          <div className="text-2xl font-black mt-1">
+            {(kpis.drawer_cash ?? 0).toFixed(2)} <span className="text-xs font-semibold text-emerald-200">{currency}</span>
+          </div>
+          <div className="text-[10px] text-emerald-100/90 font-medium mt-1">
+            In (Paid+Past) − Out (Exp+Adv+Salary)
+          </div>
+        </div>
+
+        {/* 13. Health Score */}
         <div className={`p-4 rounded-3xl border shadow-sm dark:shadow-xl backdrop-blur-md ${healthColor}`}>
           <div className="text-xs font-semibold flex items-center justify-between">
             <span>Health Score</span>

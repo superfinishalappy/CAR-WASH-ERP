@@ -2759,6 +2759,14 @@ export class DataProvider {
       status: (c.status || 'ok') as 'ok' | 'near_limit' | 'over_limit',
     }));
 
+    // Period Cash Flow & Physical Drawer Cash
+    const pCashAdj = this.cashAdjustments.filter((a) => a.company_id === cid && a.entry_date >= startDate && a.entry_date <= endDate).reduce((sum, a) => sum + a.amount, 0);
+    const totalCashInflow = collected + pCashAdj;
+    const totalActualExpenses = pExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const netAdvancesInPeriod = pAdvances.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
+    const totalCashOutflow = totalActualExpenses + netAdvancesInPeriod;
+    const drawerCash = totalCashInflow - totalCashOutflow;
+
     const periodVariableCost = operatingExpenses + totalSalary;
     const periodTotalCost = periodFixedCost + periodVariableCost;
 
@@ -2778,6 +2786,8 @@ export class DataProvider {
         net_profit: Math.round(netProfit * 100) / 100,
         cash_profit: Math.round(cashProfit * 100) / 100,
         net_margin: netMargin,
+        drawer_cash: Math.round(drawerCash * 100) / 100,
+        past_cash_collected: Math.round(pCashAdj * 100) / 100,
       },
       previous_comparison: {
         prev_start_date: prevStartStr,

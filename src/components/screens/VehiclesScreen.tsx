@@ -43,6 +43,8 @@ export function VehiclesScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [cashAdjustments, setCashAdjustments] = useState<DailyCashAdjustment[]>([]);
   const pastCashCollected = cashAdjustments.reduce((sum, a) => sum + a.amount, 0);
+  const [dailyExpenses, setDailyExpenses] = useState<number>(0);
+  const [dailyNetAdvances, setDailyNetAdvances] = useState<number>(0);
 
   const [newAdjustmentAmount, setNewAdjustmentAmount] = useState('');
   const [newAdjustmentNote, setNewAdjustmentNote] = useState('');
@@ -97,6 +99,12 @@ export function VehiclesScreen() {
     const j = dataProvider.getJobs(selectedDate);
     setJobs(j);
     setCashAdjustments(dataProvider.getDailyCashAdjustments(selectedDate));
+
+    const expList = dataProvider.getExpenses().filter((e) => e.entry_date === selectedDate);
+    setDailyExpenses(expList.reduce((sum, e) => sum + e.amount, 0));
+
+    const advList = dataProvider.getAdvances().filter((a) => a.entry_date === selectedDate);
+    setDailyNetAdvances(advList.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0));
     
     const batches = dataProvider.getActiveBatches();
     setActiveBatches(batches);
@@ -542,6 +550,9 @@ export function VehiclesScreen() {
   const totalExtra = jobs.reduce((sum, j) => sum + (j.extra_amount || 0), 0);
   const paidRev = jobs.filter((j) => j.is_paid).reduce((sum, j) => sum + j.total, 0);
   const unpaidRev = jobs.filter((j) => !j.is_paid).reduce((sum, j) => sum + j.total, 0);
+  const totalDrawerIn = paidRev + pastCashCollected;
+  const totalDrawerOut = dailyExpenses + dailyNetAdvances;
+  const cashInDrawer = totalDrawerIn - totalDrawerOut;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -633,12 +644,22 @@ export function VehiclesScreen() {
             <div className="text-[10px] text-fuchsia-600/80 dark:text-fuchsia-400/80">Past Debts Collected Today</div>
           </div>
           <div className="col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
-            <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4" /> Total Cash in Drawer
+            <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> Total Cash in Drawer</span>
+              {totalDrawerOut > 0 && (
+                <span className="text-[10px] font-medium bg-emerald-700/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                  Out: -{totalDrawerOut.toFixed(2)}
+                </span>
+              )}
             </div>
             <div className="text-3xl font-black mt-1">
-              {(paidRev + pastCashCollected).toFixed(2)} <span className="text-sm font-semibold text-emerald-200">{currency}</span>
+              {cashInDrawer.toFixed(2)} <span className="text-sm font-semibold text-emerald-200">{currency}</span>
             </div>
+            {totalDrawerOut > 0 && (
+              <div className="text-[10px] text-emerald-100/90 font-medium mt-0.5">
+                In: +{totalDrawerIn.toFixed(2)} | Out (Exp/Adv/Salary): -{totalDrawerOut.toFixed(2)}
+              </div>
+            )}
           </div>
           <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
             <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>

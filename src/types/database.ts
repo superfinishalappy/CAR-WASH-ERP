@@ -190,6 +190,8 @@ export interface ReportKPIs {
   net_profit: number;
   cash_profit: number;
   net_margin: number;
+  drawer_cash?: number;
+  past_cash_collected?: number;
 }
 
 export interface PreviousComparison {
