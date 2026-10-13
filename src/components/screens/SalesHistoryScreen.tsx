@@ -47,7 +47,7 @@ export function SalesHistoryScreen() {
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
 
   // Filter States
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid' | 'current_paid' | 'late_paid'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'except_late' | 'late_paid' | 'paid' | 'unpaid'>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all'); // 'all', 'walkin', 'registered', or customer.id
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [workTypeFilter, setWorkTypeFilter] = useState<string>('all');
@@ -170,48 +170,24 @@ export function SalesHistoryScreen() {
     searchTerm,
   ]);
 
-  // Summary Metrics calculated from scopeJobs (shows full financial overview for the selected date/filter period)
-  const metrics = useMemo(() => {
-    const totalCount = scopeJobs.length;
-    const totalRevenue = scopeJobs.reduce((sum, j) => sum + j.total, 0);
-    const paidJobs = scopeJobs.filter((j) => j.is_paid);
-    const unpaidJobs = scopeJobs.filter((j) => !j.is_paid);
-
-    const currentPaidJobs = paidJobs.filter((j) => !j.payment_date || j.payment_date === j.entry_date);
-    const latePaidJobs = paidJobs.filter((j) => Boolean(j.payment_date && j.payment_date !== j.entry_date));
-
-    const paidRevenue = paidJobs.reduce((sum, j) => sum + j.total, 0);
-    const currentPaidRevenue = currentPaidJobs.reduce((sum, j) => sum + j.total, 0);
-    const latePaidRevenue = latePaidJobs.reduce((sum, j) => sum + j.total, 0);
-    const unpaidRevenue = unpaidJobs.reduce((sum, j) => sum + j.total, 0);
-
-    return {
-      totalCount,
-      totalRevenue,
-      paidCount: paidJobs.length,
-      paidRevenue,
-      currentPaidCount: currentPaidJobs.length,
-      currentPaidRevenue,
-      latePaidCount: latePaidJobs.length,
-      latePaidRevenue,
-      unpaidCount: unpaidJobs.length,
-      unpaidRevenue,
-    };
+  // Overall counts for filter tab badges in the current scope
+  const filterCounts = useMemo(() => {
+    const allCount = scopeJobs.length;
+    const exceptLateCount = scopeJobs.filter((j) => !(j.is_paid && j.payment_date && j.payment_date !== j.entry_date)).length;
+    const lateCount = scopeJobs.filter((j) => Boolean(j.is_paid && j.payment_date && j.payment_date !== j.entry_date)).length;
+    const paidCount = scopeJobs.filter((j) => j.is_paid).length;
+    const unpaidCount = scopeJobs.filter((j) => !j.is_paid).length;
+    return { allCount, exceptLateCount, lateCount, paidCount, unpaidCount };
   }, [scopeJobs]);
 
   // Final filtered & sorted jobs applying statusFilter and sortBy
   const filteredJobs = useMemo(() => {
     return scopeJobs
       .filter((job) => {
+        const isLatePaid = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
+        if (statusFilter === 'except_late' && isLatePaid) return false;
+        if (statusFilter === 'late_paid' && !isLatePaid) return false;
         if (statusFilter === 'paid' && !job.is_paid) return false;
-        if (statusFilter === 'current_paid') {
-          const isCurrentPaid = job.is_paid && (!job.payment_date || job.payment_date === job.entry_date);
-          if (!isCurrentPaid) return false;
-        }
-        if (statusFilter === 'late_paid') {
-          const isLatePaid = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
-          if (!isLatePaid) return false;
-        }
         if (statusFilter === 'unpaid' && job.is_paid) return false;
         return true;
       })
@@ -235,6 +211,26 @@ export function SalesHistoryScreen() {
         return 0;
       });
   }, [scopeJobs, statusFilter, sortBy]);
+
+  // Summary Metrics calculated dynamically from filteredJobs (changes amount on top according to filter, like old!)
+  const metrics = useMemo(() => {
+    const totalCount = filteredJobs.length;
+    const totalRevenue = filteredJobs.reduce((sum, j) => sum + j.total, 0);
+    const paidJobs = filteredJobs.filter((j) => j.is_paid);
+    const unpaidJobs = filteredJobs.filter((j) => !j.is_paid);
+
+    const paidRevenue = paidJobs.reduce((sum, j) => sum + j.total, 0);
+    const unpaidRevenue = unpaidJobs.reduce((sum, j) => sum + j.total, 0);
+
+    return {
+      totalCount,
+      totalRevenue,
+      paidCount: paidJobs.length,
+      paidRevenue,
+      unpaidCount: unpaidJobs.length,
+      unpaidRevenue,
+    };
+  }, [filteredJobs]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -420,9 +416,9 @@ export function SalesHistoryScreen() {
         </div>
       </div>
 
-      {/* Top Summary KPI Cards - Total Cash, Paid (Current & Late breakdown), Unpaid */}
+      {/* Top Summary KPI Cards - Total Cash, Collected / Paid, Unpaid / Due */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {/* 1. Total Cash (formerly Total Sales) */}
+        {/* 1. Total Cash */}
         {(isOwner || isManager || isSeniorStaff) && (
           <div
             onClick={() => setStatusFilter('all')}
@@ -447,80 +443,27 @@ export function SalesHistoryScreen() {
           </div>
         )}
 
-        {/* 2. Total Paid Sales with Current Date Paid & Late Paid Breakdown */}
+        {/* 2. Collected / Paid */}
         {(isOwner || isManager || isSeniorStaff) && (
           <div
-            className={`p-4 sm:p-5 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border transition shadow-sm backdrop-blur-md ${
-              statusFilter === 'paid' || statusFilter === 'current_paid' || statusFilter === 'late_paid'
+            onClick={() => setStatusFilter(statusFilter === 'paid' ? 'all' : 'paid')}
+            className={`p-4 sm:p-5 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
+              statusFilter === 'paid'
                 ? 'border-emerald-500 ring-2 ring-emerald-500/20'
                 : 'border-emerald-200 dark:border-emerald-800/40'
             }`}
           >
             <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('paid')}
-                className="font-bold uppercase tracking-wider text-[11px] hover:underline text-left flex items-center gap-1"
-                title="Click to view all paid transactions"
-              >
-                <span>Collected / Paid</span>
-              </button>
+              <span className="font-bold uppercase tracking-wider text-[11px]">Collected / Paid</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 mt-2 truncate">
               {metrics.paidRevenue.toFixed(2)}{' '}
               <span className="text-xs font-bold text-emerald-600/70">{currency}</span>
             </div>
-
-            {/* Breakdown: Current Date Paid vs Late Paid */}
-            <div className="mt-2.5 pt-2 border-t border-emerald-200/70 dark:border-emerald-800/40 grid grid-cols-2 gap-2 text-[11px]">
-              {/* Current Date Paid Pill */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setStatusFilter(statusFilter === 'current_paid' ? 'paid' : 'current_paid');
-                }}
-                className={`p-1.5 rounded-xl border text-left transition ${
-                  statusFilter === 'current_paid'
-                    ? 'bg-teal-600 text-white border-teal-700 shadow-sm'
-                    : 'bg-white/80 dark:bg-slate-900/80 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700/60'
-                }`}
-                title="Filter by Current Date Paid (Same Day)"
-              >
-                <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 opacity-90">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                  Current Date Paid
-                </div>
-                <div className="font-extrabold text-xs mt-0.5">
-                  {metrics.currentPaidRevenue.toFixed(2)} <span className="text-[9px] font-normal">{currency}</span>
-                </div>
-                <div className="text-[10px] opacity-75">{metrics.currentPaidCount} orders</div>
-              </button>
-
-              {/* Late Paid Pill */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setStatusFilter(statusFilter === 'late_paid' ? 'paid' : 'late_paid');
-                }}
-                className={`p-1.5 rounded-xl border text-left transition ${
-                  statusFilter === 'late_paid'
-                    ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
-                    : 'bg-white/80 dark:bg-slate-900/80 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-900 dark:text-purple-200 border-purple-300 dark:border-purple-700/60'
-                }`}
-                title="Filter by Late Paid (Old jobs collected on this date)"
-              >
-                <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 opacity-90">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                  Late Paid
-                </div>
-                <div className="font-extrabold text-xs mt-0.5">
-                  {metrics.latePaidRevenue.toFixed(2)} <span className="text-[9px] font-normal">{currency}</span>
-                </div>
-                <div className="text-[10px] opacity-75">{metrics.latePaidCount} past orders</div>
-              </button>
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-semibold flex items-center justify-between">
+              <span>{metrics.paidCount} paid orders</span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Filter Paid →</span>
             </div>
           </div>
         )}
@@ -528,7 +471,7 @@ export function SalesHistoryScreen() {
         {/* 3. Total Unpaid / Credit Due */}
         {(isOwner || isManager || isSeniorStaff) && (
           <div
-            onClick={() => setStatusFilter('unpaid')}
+            onClick={() => setStatusFilter(statusFilter === 'unpaid' ? 'all' : 'unpaid')}
             className={`p-4 sm:p-5 rounded-3xl bg-rose-50/70 dark:bg-rose-950/20 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
               statusFilter === 'unpaid'
                 ? 'border-rose-500 ring-2 ring-rose-500/20'
@@ -553,7 +496,7 @@ export function SalesHistoryScreen() {
 
       {/* Filter Bar Card */}
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
-        {/* Row 1: Payment Status Tabs (All, All Paid, Current Date Paid, Late Paid, Unpaid) */}
+        {/* Row 1: Payment Status Tabs (All, Except Late Paid, Late Paid, Paid Only, Unpaid Only) */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex items-center flex-wrap gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
             <button
@@ -565,34 +508,21 @@ export function SalesHistoryScreen() {
               }`}
             >
               <span>All Sales</span>
-              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.totalCount}</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{filterCounts.allCount}</span>
             </button>
 
             <button
-              onClick={() => setStatusFilter('paid')}
+              onClick={() => setStatusFilter('except_late')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                statusFilter === 'paid'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>All Paid</span>
-              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.paidCount}</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('current_paid')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                statusFilter === 'current_paid'
+                statusFilter === 'except_late'
                   ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
                   : 'text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/40'
               }`}
-              title="Jobs completed and paid on the same date"
+              title="Today's sales excluding older recovered payments"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-              <span>Current Date Paid</span>
-              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.currentPaidCount}</span>
+              <span>Except Late Paid</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{filterCounts.exceptLateCount}</span>
             </button>
 
             <button
@@ -606,7 +536,20 @@ export function SalesHistoryScreen() {
             >
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
               <span>Late Paid</span>
-              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.latePaidCount}</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{filterCounts.lateCount}</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('paid')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                statusFilter === 'paid'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Paid Only</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{filterCounts.paidCount}</span>
             </button>
 
             <button
@@ -619,7 +562,7 @@ export function SalesHistoryScreen() {
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Unpaid Only</span>
-              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.unpaidCount}</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{filterCounts.unpaidCount}</span>
             </button>
           </div>
 
