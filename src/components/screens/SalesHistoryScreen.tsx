@@ -47,7 +47,7 @@ export function SalesHistoryScreen() {
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
 
   // Filter States
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid' | 'current_paid' | 'late_paid'>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all'); // 'all', 'walkin', 'registered', or customer.id
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [workTypeFilter, setWorkTypeFilter] = useState<string>('all');
@@ -116,29 +116,25 @@ export function SalesHistoryScreen() {
     return null; // All time
   };
 
-  // Filter & Sort Logic
-  const filteredJobs = useMemo(() => {
+  // Base filtered jobs across date, customer, staff, work type, and search term (BEFORE payment status filter)
+  const scopeJobs = useMemo(() => {
     const dateRange = getDateRange();
 
     return jobs.filter((job) => {
-      // 1. Payment Status Filter
-      if (statusFilter === 'paid' && !job.is_paid) return false;
-      if (statusFilter === 'unpaid' && job.is_paid) return false;
-
-      // 2. Customer Filter
+      // 1. Customer Filter
       if (customerFilter === 'walkin' && job.customer_id) return false;
       if (customerFilter === 'registered' && !job.customer_id) return false;
       if (customerFilter !== 'all' && customerFilter !== 'walkin' && customerFilter !== 'registered') {
         if (job.customer_id !== customerFilter) return false;
       }
 
-      // 3. Staff Filter
+      // 2. Staff Filter
       if (staffFilter !== 'all' && job.staff_id !== staffFilter) return false;
 
-      // 4. Work Type Filter
+      // 3. Work Type Filter
       if (workTypeFilter !== 'all' && job.work_type !== workTypeFilter) return false;
 
-      // 5. Date Filter (Includes vehicles washed in range OR old vehicles paid in range)
+      // 4. Date Filter (Includes vehicles washed in range OR old vehicles paid in range)
       if (dateRange) {
         const washedInRange = job.entry_date >= dateRange.start && job.entry_date <= dateRange.end;
         const paidInRange = Boolean(job.is_paid && job.payment_date && job.payment_date >= dateRange.start && job.payment_date <= dateRange.end);
@@ -147,7 +143,7 @@ export function SalesHistoryScreen() {
         }
       }
 
-      // 6. Search Term Filter
+      // 5. Search Term Filter
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matchesPlate = (job.plate || '').toLowerCase().includes(q);
@@ -162,28 +158,9 @@ export function SalesHistoryScreen() {
       }
 
       return true;
-    }).sort((a, b) => {
-      if (sortBy === 'newest') {
-        const dateComp = b.entry_date.localeCompare(a.entry_date);
-        if (dateComp !== 0) return dateComp;
-        return (b.created_at || '').localeCompare(a.created_at || '');
-      }
-      if (sortBy === 'oldest') {
-        const dateComp = a.entry_date.localeCompare(b.entry_date);
-        if (dateComp !== 0) return dateComp;
-        return (a.created_at || '').localeCompare(b.created_at || '');
-      }
-      if (sortBy === 'highest') {
-        return b.total - a.total;
-      }
-      if (sortBy === 'lowest') {
-        return a.total - b.total;
-      }
-      return 0;
     });
   }, [
     jobs,
-    statusFilter,
     customerFilter,
     staffFilter,
     workTypeFilter,
@@ -191,8 +168,73 @@ export function SalesHistoryScreen() {
     customStartDate,
     customEndDate,
     searchTerm,
-    sortBy,
   ]);
+
+  // Summary Metrics calculated from scopeJobs (shows full financial overview for the selected date/filter period)
+  const metrics = useMemo(() => {
+    const totalCount = scopeJobs.length;
+    const totalRevenue = scopeJobs.reduce((sum, j) => sum + j.total, 0);
+    const paidJobs = scopeJobs.filter((j) => j.is_paid);
+    const unpaidJobs = scopeJobs.filter((j) => !j.is_paid);
+
+    const currentPaidJobs = paidJobs.filter((j) => !j.payment_date || j.payment_date === j.entry_date);
+    const latePaidJobs = paidJobs.filter((j) => Boolean(j.payment_date && j.payment_date !== j.entry_date));
+
+    const paidRevenue = paidJobs.reduce((sum, j) => sum + j.total, 0);
+    const currentPaidRevenue = currentPaidJobs.reduce((sum, j) => sum + j.total, 0);
+    const latePaidRevenue = latePaidJobs.reduce((sum, j) => sum + j.total, 0);
+    const unpaidRevenue = unpaidJobs.reduce((sum, j) => sum + j.total, 0);
+
+    return {
+      totalCount,
+      totalRevenue,
+      paidCount: paidJobs.length,
+      paidRevenue,
+      currentPaidCount: currentPaidJobs.length,
+      currentPaidRevenue,
+      latePaidCount: latePaidJobs.length,
+      latePaidRevenue,
+      unpaidCount: unpaidJobs.length,
+      unpaidRevenue,
+    };
+  }, [scopeJobs]);
+
+  // Final filtered & sorted jobs applying statusFilter and sortBy
+  const filteredJobs = useMemo(() => {
+    return scopeJobs
+      .filter((job) => {
+        if (statusFilter === 'paid' && !job.is_paid) return false;
+        if (statusFilter === 'current_paid') {
+          const isCurrentPaid = job.is_paid && (!job.payment_date || job.payment_date === job.entry_date);
+          if (!isCurrentPaid) return false;
+        }
+        if (statusFilter === 'late_paid') {
+          const isLatePaid = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
+          if (!isLatePaid) return false;
+        }
+        if (statusFilter === 'unpaid' && job.is_paid) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          const dateComp = b.entry_date.localeCompare(a.entry_date);
+          if (dateComp !== 0) return dateComp;
+          return (b.created_at || '').localeCompare(a.created_at || '');
+        }
+        if (sortBy === 'oldest') {
+          const dateComp = a.entry_date.localeCompare(b.entry_date);
+          if (dateComp !== 0) return dateComp;
+          return (a.created_at || '').localeCompare(b.created_at || '');
+        }
+        if (sortBy === 'highest') {
+          return b.total - a.total;
+        }
+        if (sortBy === 'lowest') {
+          return a.total - b.total;
+        }
+        return 0;
+      });
+  }, [scopeJobs, statusFilter, sortBy]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -204,39 +246,6 @@ export function SalesHistoryScreen() {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
     return filteredJobs.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredJobs, currentPage]);
-
-  // Summary Metrics for the currently filtered set
-  const metrics = useMemo(() => {
-    const totalCount = filteredJobs.length;
-    const totalRevenue = filteredJobs.reduce((sum, j) => sum + j.total, 0);
-    const totalBase = filteredJobs.reduce((sum, j) => sum + (j.price || 0), 0);
-    const totalExtra = filteredJobs.reduce((sum, j) => sum + (j.extra_amount || 0), 0);
-    const paidJobs = filteredJobs.filter((j) => j.is_paid);
-    const unpaidJobs = filteredJobs.filter((j) => !j.is_paid);
-
-    const paidRevenue = paidJobs.reduce((sum, j) => sum + j.total, 0);
-    const unpaidRevenue = unpaidJobs.reduce((sum, j) => sum + j.total, 0);
-    const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
-
-    return {
-      totalCount,
-      totalRevenue,
-      totalBase,
-      totalExtra,
-      paidCount: paidJobs.length,
-      paidRevenue,
-      unpaidCount: unpaidJobs.length,
-      unpaidRevenue,
-      avgTicket,
-    };
-  }, [filteredJobs]);
-
-  // Overall counts for filter tab badges
-  const overallCounts = useMemo(() => {
-    const paid = jobs.filter((j) => j.is_paid).length;
-    const unpaid = jobs.filter((j) => !j.is_paid).length;
-    return { all: jobs.length, paid, unpaid };
-  }, [jobs]);
 
   // Quick 1-Click Toggle Paid / Unpaid Status
   const handleTogglePayment = async (job: Job) => {
@@ -323,7 +332,11 @@ export function SalesHistoryScreen() {
       'Base Price': j.price.toFixed(2),
       Extra: j.extra_amount.toFixed(2),
       Total: j.total.toFixed(2),
-      'Payment Status': j.is_paid ? 'PAID' : 'UNPAID',
+      'Payment Status': j.is_paid
+        ? j.payment_date && j.payment_date !== j.entry_date
+          ? `PAID LATE (${j.payment_date})`
+          : `PAID (${j.payment_date || j.entry_date})`
+        : 'UNPAID',
     }));
     exportToCSV(`sales_history_${getTodayString(session?.company?.timezone)}`, rows);
     showToast('Exported sales history to CSV', 'success');
@@ -407,118 +420,198 @@ export function SalesHistoryScreen() {
         </div>
       </div>
 
-      {/* Top Summary KPI Cards - Total Revenue, Base Amount, Extra Amount, Paid, Unpaid, Avg */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Total Filtered Sales */}
-        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <span>Total Sales</span>
-            <Receipt className="w-4 h-4 text-blue-500" />
+      {/* Top Summary KPI Cards - Total Cash, Paid (Current & Late breakdown), Unpaid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {/* 1. Total Cash (formerly Total Sales) */}
+        {(isOwner || isManager || isSeniorStaff) && (
+          <div
+            onClick={() => setStatusFilter('all')}
+            className={`p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/90 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
+              statusFilter === 'all'
+                ? 'border-blue-500 ring-2 ring-blue-500/20'
+                : 'border-slate-200 dark:border-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <span className="font-bold uppercase tracking-wider text-[11px] text-blue-600 dark:text-blue-400">Total Cash</span>
+              <DollarSign className="w-4 h-4 text-blue-500" />
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-2 truncate">
+              {metrics.totalRevenue.toFixed(2)}{' '}
+              <span className="text-xs font-bold text-slate-400">{currency}</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1 font-semibold flex items-center justify-between">
+              <span>{metrics.totalCount} orders</span>
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">View All →</span>
+            </div>
           </div>
-          <div className="text-xl font-black text-slate-900 dark:text-white mt-2 truncate">
-            {metrics.totalRevenue.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-slate-400">{currency}</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1 font-semibold">
-            {metrics.totalCount} orders
-          </div>
-        </div>)}
+        )}
 
-        {/* Base Amount */}
-        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-blue-700 dark:text-blue-400 font-medium">
-            <span>Base Price</span>
-            <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="text-xl font-black text-blue-900 dark:text-blue-200 mt-2 truncate">
-            {metrics.totalBase.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-blue-500">{currency}</span>
-          </div>
-          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-semibold">
-            Standard service
-          </div>
-        </div>)}
+        {/* 2. Total Paid Sales with Current Date Paid & Late Paid Breakdown */}
+        {(isOwner || isManager || isSeniorStaff) && (
+          <div
+            className={`p-4 sm:p-5 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border transition shadow-sm backdrop-blur-md ${
+              statusFilter === 'paid' || statusFilter === 'current_paid' || statusFilter === 'late_paid'
+                ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                : 'border-emerald-200 dark:border-emerald-800/40'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('paid')}
+                className="font-bold uppercase tracking-wider text-[11px] hover:underline text-left flex items-center gap-1"
+                title="Click to view all paid transactions"
+              >
+                <span>Collected / Paid</span>
+              </button>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 mt-2 truncate">
+              {metrics.paidRevenue.toFixed(2)}{' '}
+              <span className="text-xs font-bold text-emerald-600/70">{currency}</span>
+            </div>
 
-        {/* Extra Amount */}
-        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-400 font-medium">
-            <span>Extra Polish/Addons</span>
-            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="text-xl font-black text-amber-900 dark:text-amber-200 mt-2 truncate">
-            {metrics.totalExtra.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-amber-500">{currency}</span>
-          </div>
-          <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-semibold">
-            100% Workshop
-          </div>
-        </div>)}
+            {/* Breakdown: Current Date Paid vs Late Paid */}
+            <div className="mt-2.5 pt-2 border-t border-emerald-200/70 dark:border-emerald-800/40 grid grid-cols-2 gap-2 text-[11px]">
+              {/* Current Date Paid Pill */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusFilter(statusFilter === 'current_paid' ? 'paid' : 'current_paid');
+                }}
+                className={`p-1.5 rounded-xl border text-left transition ${
+                  statusFilter === 'current_paid'
+                    ? 'bg-teal-600 text-white border-teal-700 shadow-sm'
+                    : 'bg-white/80 dark:bg-slate-900/80 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700/60'
+                }`}
+                title="Filter by Current Date Paid (Same Day)"
+              >
+                <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 opacity-90">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                  Current Date Paid
+                </div>
+                <div className="font-extrabold text-xs mt-0.5">
+                  {metrics.currentPaidRevenue.toFixed(2)} <span className="text-[9px] font-normal">{currency}</span>
+                </div>
+                <div className="text-[10px] opacity-75">{metrics.currentPaidCount} orders</div>
+              </button>
 
-        {/* Total Paid Sales */}
-        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-            <span>Collected / Paid</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              {/* Late Paid Pill */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusFilter(statusFilter === 'late_paid' ? 'paid' : 'late_paid');
+                }}
+                className={`p-1.5 rounded-xl border text-left transition ${
+                  statusFilter === 'late_paid'
+                    ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
+                    : 'bg-white/80 dark:bg-slate-900/80 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-900 dark:text-purple-200 border-purple-300 dark:border-purple-700/60'
+                }`}
+                title="Filter by Late Paid (Old jobs collected on this date)"
+              >
+                <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 opacity-90">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                  Late Paid
+                </div>
+                <div className="font-extrabold text-xs mt-0.5">
+                  {metrics.latePaidRevenue.toFixed(2)} <span className="text-[9px] font-normal">{currency}</span>
+                </div>
+                <div className="text-[10px] opacity-75">{metrics.latePaidCount} past orders</div>
+              </button>
+            </div>
           </div>
-          <div className="text-xl font-black text-emerald-800 dark:text-emerald-300 mt-2 truncate">
-            {metrics.paidRevenue.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-emerald-600/70">{currency}</span>
-          </div>
-          <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-semibold">
-            {metrics.paidCount} paid
-          </div>
-        </div>)}
+        )}
 
-        {/* Total Unpaid / Credit Due */}
-        {(isOwner || isManager || isSeniorStaff) && (<div className="p-4 rounded-3xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-rose-700 dark:text-rose-400 font-medium">
-            <span>Unpaid / Due</span>
-            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+        {/* 3. Total Unpaid / Credit Due */}
+        {(isOwner || isManager || isSeniorStaff) && (
+          <div
+            onClick={() => setStatusFilter('unpaid')}
+            className={`p-4 sm:p-5 rounded-3xl bg-rose-50/70 dark:bg-rose-950/20 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
+              statusFilter === 'unpaid'
+                ? 'border-rose-500 ring-2 ring-rose-500/20'
+                : 'border-rose-200 dark:border-rose-800/40'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs text-rose-700 dark:text-rose-400 font-medium">
+              <span className="font-bold uppercase tracking-wider text-[11px]">Unpaid / Due</span>
+              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div className="text-2xl font-black text-rose-800 dark:text-rose-300 mt-2 truncate">
+              {metrics.unpaidRevenue.toFixed(2)}{' '}
+              <span className="text-xs font-bold text-rose-600/70">{currency}</span>
+            </div>
+            <div className="text-xs text-rose-700 dark:text-rose-400 mt-1 font-semibold flex items-center justify-between">
+              <span>{metrics.unpaidCount} unpaid/credit</span>
+              <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Filter Unpaid →</span>
+            </div>
           </div>
-          <div className="text-xl font-black text-rose-800 dark:text-rose-300 mt-2 truncate">
-            {metrics.unpaidRevenue.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-rose-600/70">{currency}</span>
-          </div>
-          <div className="text-xs text-rose-700 dark:text-rose-400 mt-1 font-semibold">
-            {metrics.unpaidCount} unpaid/credit
-          </div>
-        </div>)}
-
-        {/* Average Job Value */}
-        {(isOwner || isManager) && (<div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <span>Avg Ticket</span>
-            <DollarSign className="w-4 h-4 text-indigo-500" />
-          </div>
-          <div className="text-xl font-black text-slate-900 dark:text-white mt-2 truncate">
-            {metrics.avgTicket.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-slate-400">{currency}</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1 font-semibold">
-            Per vehicle
-          </div>
-        </div>)}
+        )}
       </div>
 
       {/* Filter Bar Card */}
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
-        {/* Row 1: Payment Status Tabs (All, Unpaid, Paid) */}
+        {/* Row 1: Payment Status Tabs (All, All Paid, Current Date Paid, Late Paid, Unpaid) */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center flex-wrap gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                 statusFilter === 'all'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <span>All Sales</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.totalCount}</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('paid')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                statusFilter === 'paid'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>All Paid</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.paidCount}</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('current_paid')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                statusFilter === 'current_paid'
+                  ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                  : 'text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/40'
+              }`}
+              title="Jobs completed and paid on the same date"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+              <span>Current Date Paid</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.currentPaidCount}</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('late_paid')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                statusFilter === 'late_paid'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                  : 'text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+              }`}
+              title="Old jobs from prior days collected on this date"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+              <span>Late Paid</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.latePaidCount}</span>
             </button>
 
             <button
               onClick={() => setStatusFilter('unpaid')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                 statusFilter === 'unpaid'
                   ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
                   : 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
@@ -526,18 +619,7 @@ export function SalesHistoryScreen() {
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Unpaid Only</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('paid')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                statusFilter === 'paid'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Paid Only</span>
+              <span className="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10">{metrics.unpaidCount}</span>
             </button>
           </div>
 
