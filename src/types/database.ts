@@ -185,6 +185,7 @@ export interface ReportKPIs {
   unpaid: number;
   customer_balances_due: number;
   expenses: number;
+  operating_expenses?: number;
   total_salary: number;
   total_advances: number;
   net_profit: number;

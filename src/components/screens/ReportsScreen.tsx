@@ -154,7 +154,7 @@ export function ReportsScreen() {
       { Metric: 'Cash Collected', Value: report.kpis.collected },
       { Metric: 'Period Unpaid', Value: report.kpis.unpaid },
       { Metric: 'Customer Balances Due', Value: report.kpis.customer_balances_due },
-      { Metric: 'Operating Expenses (excl. Salary)', Value: report.kpis.expenses },
+      { Metric: 'Total Expenses (Expenses + Advances + Paid Salary)', Value: report.kpis.expenses },
       { Metric: 'Total Staff Payroll', Value: report.kpis.total_salary },
       { Metric: 'Net Profit', Value: report.kpis.net_profit },
       { Metric: 'Net Margin (%)', Value: `${(report.kpis.net_margin * 100).toFixed(1)}%` },
@@ -179,7 +179,7 @@ export function ReportsScreen() {
           { Metric: 'Cash Collected', Value: report.kpis.collected },
           { Metric: 'Period Unpaid', Value: report.kpis.unpaid },
           { Metric: 'Customer Balances Due', Value: report.kpis.customer_balances_due },
-          { Metric: 'Operating Expenses (excl. Salary)', Value: report.kpis.expenses },
+          { Metric: 'Total Expenses (Expenses + Advances + Paid Salary)', Value: report.kpis.expenses },
           { Metric: 'Total Staff Payroll', Value: report.kpis.total_salary },
           { Metric: 'Net Profit', Value: report.kpis.net_profit },
           { Metric: 'Cash Profit', Value: report.kpis.cash_profit },
@@ -517,15 +517,15 @@ export function ReportsScreen() {
           <div className="text-[10px] text-rose-600 dark:text-rose-500/80 mt-1">Total Credit Debt</div>
         </div>
 
-        {/* 8. Operating Expenses (OPEX - excluding staff salary) */}
+        {/* 8. Total Expenses (total expense + advances + paid salary) */}
         <div className="p-4 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl backdrop-blur-md">
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
-            <span>Operating Expenses</span>
+            <span>Total Expenses</span>
             <Receipt className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
           </div>
           <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{kpis.expenses.toFixed(2)}</div>
           <div className="text-[10px] text-slate-500 mt-1">
-            Supplies & OPEX (Excl. Salary)
+            Expenses + Advances + Paid Salary
           </div>
         </div>
 
@@ -700,7 +700,7 @@ export function ReportsScreen() {
                 </td>
               </tr>
               <tr>
-                <td className="py-2.5 px-4 font-bold text-slate-800 dark:text-slate-200">Operating Expenses</td>
+                <td className="py-2.5 px-4 font-bold text-slate-800 dark:text-slate-200">Total Expenses</td>
                 <td className="py-2.5 px-4 text-right rtl:text-left font-bold text-slate-900 dark:text-white">
                   {kpis.expenses.toFixed(2)}
                 </td>
@@ -785,7 +785,7 @@ export function ReportsScreen() {
         <div className="lg:col-span-2 p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 border-b border-slate-100 dark:border-slate-800">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.reports.charts.dailyTitle}</h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Total Revenue vs. Daily Expenses</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Total Revenue vs. Daily Expenses (Expenses + Advances + Paid Salary)</span>
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -802,7 +802,7 @@ export function ReportsScreen() {
                 />
                 <Legend />
                 <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" name="Expenses (Total + Adv + Paid Salary)" fill="#f43f5e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

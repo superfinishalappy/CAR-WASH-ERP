@@ -2417,8 +2417,11 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const pExpenses = this.expenses.filter((e) => e.company_id === cid && e.entry_date >= startDate && e.entry_date <= endDate);
     const pAdvances = this.advances.filter((a) => a.company_id === cid && a.entry_date >= startDate && a.entry_date <= endDate);
     // Operating Expenses (OPEX): All operational expenses (supplies, utilities, chemicals, etc.) EXCLUDING 'Staff Salary' payouts
-    // This prevents salary from being double-deducted alongside totalSalary payroll!
     const operatingExpenses = pExpenses.filter((e) => e.category !== 'Staff Salary').reduce((sum, e) => sum + e.amount, 0);
+    // Total Report Expenses = Total Logged Expenses (Operating + Paid Salary) + Net Advances
+    const totalActualExpenses = pExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const netAdvancesInPeriod = pAdvances.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
+    const totalReportExpenses = totalActualExpenses + netAdvancesInPeriod;
 
     // Customer accounts all-time
     const custAccounts = this.getCustomers(cid);
@@ -2540,7 +2543,10 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const prevVehicles = prevJobs.length;
 
     const prevExpList = this.expenses.filter((e) => e.company_id === cid && e.entry_date >= prevStartStr && e.entry_date <= prevEndStr);
-    const prevExpenses = prevExpList.filter((e) => e.category !== 'Staff Salary').reduce((sum, e) => sum + e.amount, 0);
+    const prevAdvList = this.advances.filter((a) => a.company_id === cid && a.entry_date >= prevStartStr && a.entry_date <= prevEndStr);
+    const prevActualExpenses = prevExpList.reduce((sum, e) => sum + e.amount, 0);
+    const prevNetAdvances = prevAdvList.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
+    const prevExpenses = prevActualExpenses + prevNetAdvances;
 
     let prevSalary = 0;
     for (const staff of companyStaff) {
@@ -2568,7 +2574,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     }
     const prevNet = prevRevenue - prevExpenses - prevSalary;
     const salesGrowth = prevRevenue > 0 ? (revenue - prevRevenue) / prevRevenue : 0;
-    const expGrowth = prevExpenses > 0 ? (operatingExpenses - prevExpenses) / prevExpenses : 0;
+    const expGrowth = prevExpenses > 0 ? (totalReportExpenses - prevExpenses) / prevExpenses : 0;
 
     // 10-Rule Diagnostic Health Score Engine (§8)
     let healthScore = 100;
@@ -2775,10 +2781,17 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
       }
     }
 
-    // Operating and logged expenses for each day (reflects actual expenses logged)
+    // Chart daily expenses: total expense (operating) + advances + paid salary
     for (const e of pExpenses) {
       if (dailyMap[e.entry_date]) {
         dailyMap[e.entry_date].expenses += e.amount;
+      }
+    }
+
+    for (const a of pAdvances) {
+      if (dailyMap[a.entry_date]) {
+        const isRepayment = (a.note || '').includes('[REPAYMENT]');
+        dailyMap[a.entry_date].expenses += isRepayment ? -a.amount : a.amount;
       }
     }
 
@@ -2881,8 +2894,6 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     });
     const cashCollectedInPeriod = periodJobsPaid.reduce((sum, j) => sum + j.total, 0);
     const totalCashInflow = cashCollectedInPeriod + pCashAdj;
-    const totalActualExpenses = pExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const netAdvancesInPeriod = pAdvances.reduce((sum, a) => sum + ((a.note || '').includes('[REPAYMENT]') ? -a.amount : a.amount), 0);
     const totalCashOutflow = totalActualExpenses + netAdvancesInPeriod;
     const drawerCash = totalCashInflow - totalCashOutflow;
 
@@ -2899,7 +2910,8 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
         collected: Math.round(collected * 100) / 100,
         unpaid: Math.round(unpaid * 100) / 100,
         customer_balances_due: Math.round(customerBalancesDue * 100) / 100,
-        expenses: Math.round(operatingExpenses * 100) / 100,
+        expenses: Math.round(totalReportExpenses * 100) / 100,
+        operating_expenses: Math.round(operatingExpenses * 100) / 100,
         total_salary: Math.round(totalSalary * 100) / 100,
         total_advances: Math.round(totalAdvances * 100) / 100,
         net_profit: Math.round(netProfit * 100) / 100,
