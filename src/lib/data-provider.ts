@@ -1494,6 +1494,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     extra_amount?: number;
     customer_id?: string | null;
     is_paid?: boolean;
+    payment_date?: string;
     company_id?: string;
   }): { success: boolean; job?: Job; error?: string } {
     const cid = data.company_id || this.getEffectiveCompanyId();
@@ -1507,6 +1508,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const extra = Number(data.extra_amount) || 0;
     const total = price + extra;
     const isPaid = data.is_paid !== undefined ? Boolean(data.is_paid) : false;
+    const paymentDate = isPaid ? (data.payment_date || getTodayString(this.currentSession?.company?.timezone)) : undefined;
 
     const staff = this.profiles.find((p) => p.id === data.staff_id);
     const commRate = staff && staff.pay_type === 'commission' ? Number(staff.pay_rate) || 0 : undefined;
@@ -1526,6 +1528,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
       total,
       customer_id: data.customer_id || null,
       is_paid: isPaid,
+      payment_date: paymentDate,
       commission_rate: commRate,
       commission_amount: commAmount,
       created_by: this.currentSession?.user.id || '',
@@ -1534,6 +1537,9 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
 
     if (commRate !== undefined && commAmount !== undefined) {
       this.saveJobRateCache(job.id, commRate, commAmount);
+    }
+    if (isPaid) {
+      this.saveJobPaymentCache(job.id, job.is_paid, job.payment_date);
     }
 
     this.jobs.unshift(job);
@@ -1555,6 +1561,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
         commission_amount: job.commission_amount,
         customer_id: job.customer_id,
         is_paid: job.is_paid,
+        payment_date: job.payment_date,
         created_by: job.created_by,
       }).then(({ error }) => {
         if (error) {
