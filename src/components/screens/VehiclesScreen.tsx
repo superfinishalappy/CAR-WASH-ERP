@@ -202,7 +202,12 @@ export function VehiclesScreen() {
 
   const handleTogglePayment = async (job: Job) => {
     if (!job.is_paid) {
-      // Prompt user to select/confirm payment date (defaults to today)
+      if (job.entry_date === todayStr) {
+        // Today's service marked on today: directly mark as paid today in 1-click!
+        await handleConfirmPayment(job, todayStr);
+        return;
+      }
+      // Marking after that same day (late payment): show option late/pick date!
       setPaymentModalJob(job);
       return;
     }
@@ -1214,7 +1219,7 @@ export function VehiclesScreen() {
               </div>
             </div>
 
-            {isPaid && (
+            {isPaid && selectedDate !== todayStr && (
               <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 space-y-2 mt-2">
                 <div className="flex items-center justify-between flex-wrap gap-1">
                   <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
@@ -1445,26 +1450,29 @@ export function VehiclesScreen() {
                               const isPaidLate = Boolean(job.is_paid && job.payment_date && job.payment_date !== job.entry_date);
                               const payDateDisplay = job.payment_date || job.entry_date;
                               if (isCredit) {
+                                if (job.is_paid) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPaymentModalJob(job)}
+                                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition cursor-pointer inline-flex items-center gap-1 ${
+                                        isPaidLate
+                                          ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700/60'
+                                          : 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
+                                      }`}
+                                      title="Click to change payment date"
+                                    >
+                                      {isPaidLate
+                                        ? `✓ Paid Late (${payDateDisplay})`
+                                        : `✓ Paid (${payDateDisplay})`} · {job.customer_name}
+                                      <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
+                                    </button>
+                                  );
+                                }
                                 return (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPaymentModalJob(job)}
-                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition cursor-pointer inline-flex items-center gap-1 ${
-                                      isPaidLate
-                                        ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700/60'
-                                        : job.is_paid
-                                        ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
-                                        : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20'
-                                    }`}
-                                    title={job.is_paid ? 'Click to change payment date' : 'Click to mark as paid'}
-                                  >
-                                    {isPaidLate
-                                      ? `✓ Paid Late (${payDateDisplay})`
-                                      : job.is_paid
-                                      ? `✓ Paid (${payDateDisplay})`
-                                      : 'Credit'} · {job.customer_name}
-                                    <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
-                                  </button>
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20 inline-flex items-center gap-1">
+                                    Credit · {job.customer_name}
+                                  </span>
                                 );
                               }
                               if (isPaidLate) {
@@ -1503,14 +1511,16 @@ export function VehiclesScreen() {
 
                             {/* 1-Click Toggle Paid / Unpaid Button */}
                             <div className="inline-flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setPaymentModalJob(job)}
-                                className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition shadow-sm"
-                                title={job.is_paid ? 'Change Payment Date' : 'Choose specific or late payment date'}
-                              >
-                                <Calendar className="w-3.5 h-3.5" />
-                              </button>
+                              {job.is_paid && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentModalJob(job)}
+                                  className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition shadow-sm"
+                                  title="Change Payment Date"
+                                >
+                                  <Calendar className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleTogglePayment(job)}
                                 className={`py-1 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-sm ${job.is_paid
@@ -1617,15 +1627,9 @@ export function VehiclesScreen() {
                             );
                           }
                           return (
-                            <button
-                              type="button"
-                              onClick={() => setPaymentModalJob(job)}
-                              className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                              title="Click to set payment date"
-                            >
-                              <span>✗ Unpaid</span>
-                              <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
-                            </button>
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                              ✗ Unpaid
+                            </span>
                           );
                         })()}
                         {job.photo_url && (
@@ -1739,48 +1743,35 @@ export function VehiclesScreen() {
                     </div>
 
                     <div className="pt-2 space-y-1.5">
-                      {!job.is_paid ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* Option 1: 1-Tap Paid Today */}
-                          <button
-                            type="button"
-                            onClick={() => handleConfirmPayment(job, todayStr)}
-                            className="py-2.5 px-2 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 active:scale-[0.98] flex items-center justify-center gap-1.5 transition text-center"
-                            title={`Instantly mark paid today (${todayStr})`}
-                          >
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span>✓ Paid Today</span>
-                          </button>
-
-                          {/* Option 2: Choose Late / Custom Payment Date */}
-                          <button
-                            type="button"
-                            onClick={() => setPaymentModalJob(job)}
-                            className="py-2.5 px-2 rounded-xl text-xs font-black bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30 active:scale-[0.98] flex items-center justify-center gap-1.5 transition text-center"
-                            title="Choose a specific or late payment date"
-                          >
-                            <Calendar className="w-4 h-4 shrink-0" />
-                            <span>📅 Late / Pick Date</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleTogglePayment(job)}
-                            className="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-                          >
+                      <button
+                        onClick={() => handleTogglePayment(job)}
+                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${
+                          job.is_paid
+                            ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-500/20'
+                        }`}
+                      >
+                        {job.is_paid ? (
+                          <>
                             <RotateCcw className="w-3.5 h-3.5" />
                             <span>Mark Unpaid</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentModalJob(job)}
-                            className="w-full py-2 px-3 rounded-xl text-[11px] font-bold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>Change Payment Date ({job.payment_date || job.entry_date})</span>
-                          </button>
-                        </>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Mark as Paid</span>
+                          </>
+                        )}
+                      </button>
+                      {job.is_paid && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentModalJob(job)}
+                          className="w-full py-2 px-3 rounded-xl text-[11px] font-bold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Change Payment Date ({job.payment_date || job.entry_date})</span>
+                        </button>
                       )}
                     </div>
                   </div>

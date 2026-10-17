@@ -158,7 +158,11 @@ export function CustomersScreen() {
   };
 
   const handleMarkJobPaid = (job: Job) => {
-    setPaymentModalJob(job);
+    if (job.entry_date === todayStr) {
+      handleConfirmJobPayment(job, todayStr);
+    } else {
+      setPaymentModalJob(job);
+    }
   };
 
   const handleConfirmJobPayment = async (job: Job, payDate: string) => {
@@ -719,24 +723,13 @@ export function CustomersScreen() {
                               {job.total.toFixed(2)} <span className="text-[10px] font-normal text-slate-500">{currency}</span>
                             </td>
                             <td className="py-2.5 px-3 text-right rtl:text-left">
-                              <div className="inline-flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setPaymentModalJob(job)}
-                                  className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition shadow-sm"
-                                  title="Choose specific / late payment date"
-                                >
-                                  <Calendar className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleConfirmJobPayment(job, todayStr)}
-                                  className="py-1 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] shadow-sm flex items-center gap-1 transition"
-                                  title={`Mark paid today (${todayStr})`}
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  Paid Today
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => handleMarkJobPaid(job)}
+                                className="py-1 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] shadow-sm flex items-center gap-1 ml-auto transition"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Mark as Paid
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -775,24 +768,14 @@ export function CustomersScreen() {
                           <span className="text-[11px] text-slate-500 font-semibold bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{job.vehicle_type}</span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                        <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80">
                           <button
                             type="button"
-                            onClick={() => handleConfirmJobPayment(job, todayStr)}
-                            className="py-2 px-2 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
-                            title={`Mark paid today (${todayStr})`}
+                            onClick={() => handleMarkJobPaid(job)}
+                            className="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>✓ Paid Today</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentModalJob(job)}
-                            className="py-2 px-2 rounded-xl text-xs font-black bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
-                            title="Choose specific or late payment date"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>📅 Pick Date</span>
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Mark as Paid</span>
                           </button>
                         </div>
                       </div>
