@@ -27,6 +27,7 @@ import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString } from '@/lib/date-utils';
 import { CustomerStatementModal } from '@/components/common/CustomerStatementModal';
+import { PaymentDateModal } from '@/components/common/PaymentDateModal';
 
 export function CustomersScreen() {
   const { session, showToast, t, dataVersion, triggerRefresh, currency } = useApp();
@@ -43,6 +44,7 @@ export function CustomersScreen() {
   const [pendingJobsCustomer, setPendingJobsCustomer] = useState<Customer | null>(null);
   const [constraintModalJob, setConstraintModalJob] = useState<Job | null>(null);
   const [statementCustomerId, setStatementCustomerId] = useState<string | null>(null);
+  const [paymentModalJob, setPaymentModalJob] = useState<Job | null>(null);
 
   // Form states
   const [newName, setNewName] = useState('');
@@ -154,15 +156,19 @@ export function CustomersScreen() {
     setStatementCustomerId(customerId);
   };
 
-  const handleMarkJobPaid = async (jobId: string) => {
-    const res = await dataProvider.setJobPaymentStatus(jobId, true);
+  const handleMarkJobPaid = (job: Job) => {
+    setPaymentModalJob(job);
+  };
+
+  const handleConfirmJobPayment = async (job: Job, payDate: string) => {
+    setPaymentModalJob(null);
+    const res = await dataProvider.setJobPaymentStatus(job.id, true, false, payDate);
     if (res.success) {
-      showToast('✓ Customer vehicle marked as PAID! Customer balance reduced.', 'success');
+      showToast(`✓ Customer vehicle marked as PAID on ${payDate}! Customer balance reduced.`, 'success');
       triggerRefresh();
     } else {
       if (res.isConstraintError) {
-        const job = dataProvider.getJobs().find((j) => j.id === jobId);
-        if (job) setConstraintModalJob(job);
+        setConstraintModalJob(job);
       } else {
         showToast(res.error || 'Failed to update payment status', 'error');
       }
@@ -171,9 +177,11 @@ export function CustomersScreen() {
 
   const handleRetryAfterSql = async () => {
     if (!constraintModalJob) return;
-    const res = await dataProvider.setJobPaymentStatus(constraintModalJob.id, true);
+    const tz = session?.company?.timezone;
+    const payDate = constraintModalJob.payment_date || getTodayString(tz);
+    const res = await dataProvider.setJobPaymentStatus(constraintModalJob.id, true, false, payDate);
     if (res.success) {
-      showToast('✓ Database constraint cleared! Vehicle marked as PAID! Customer balance reduced.', 'success');
+      showToast(`✓ Database constraint cleared! Vehicle marked as PAID on ${payDate}! Customer balance reduced.`, 'success');
       setConstraintModalJob(null);
       triggerRefresh();
     } else {
@@ -183,8 +191,10 @@ export function CustomersScreen() {
 
   const handleMarkLocally = async () => {
     if (!constraintModalJob) return;
-    await dataProvider.setJobPaymentStatus(constraintModalJob.id, true, true);
-    showToast('✓ Marked as PAID in local session! Customer balance updated.', 'success');
+    const tz = session?.company?.timezone;
+    const payDate = constraintModalJob.payment_date || getTodayString(tz);
+    await dataProvider.setJobPaymentStatus(constraintModalJob.id, true, true, payDate);
+    showToast(`✓ Marked as PAID in local session! Customer balance updated.`, 'success');
     setConstraintModalJob(null);
     triggerRefresh();
   };
@@ -708,7 +718,7 @@ export function CustomersScreen() {
                             </td>
                             <td className="py-2.5 px-3 text-right rtl:text-left">
                               <button
-                                onClick={() => handleMarkJobPaid(job.id)}
+                                onClick={() => handleMarkJobPaid(job)}
                                 className="py-1 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] shadow-sm flex items-center gap-1 ml-auto transition"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -754,6 +764,15 @@ export function CustomersScreen() {
               }
             : undefined
         }
+      />
+      {/* Payment Date Picker Modal */}
+      <PaymentDateModal
+        job={paymentModalJob}
+        isOpen={Boolean(paymentModalJob)}
+        onClose={() => setPaymentModalJob(null)}
+        onConfirm={handleConfirmJobPayment}
+        timezone={session?.company?.timezone}
+        currency={currency}
       />
     </div>
   );

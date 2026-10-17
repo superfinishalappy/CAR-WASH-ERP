@@ -1579,6 +1579,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
       price: number;
       extra_amount?: number;
       is_paid?: boolean;
+      payment_date?: string;
       customer_id?: string | null;
       entry_date?: string;
       photo_url?: string;
@@ -1614,7 +1615,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     job.customer_id = data.customer_id || null;
     job.is_paid = data.is_paid !== undefined ? Boolean(data.is_paid) : (data.customer_id ? false : true);
     if (job.is_paid) {
-      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+      job.payment_date = data.payment_date !== undefined ? (data.payment_date || getTodayString(this.currentSession?.company?.timezone)) : (job.payment_date || getTodayString(this.currentSession?.company?.timezone));
     } else {
       job.payment_date = undefined;
     }
@@ -1701,7 +1702,8 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
 
   public async toggleJobPayment(
     id: string,
-    forceLocal = false
+    forceLocal = false,
+    customPaymentDate?: string
   ): Promise<{ success: boolean; job?: Job; error?: string; isConstraintError?: boolean; sqlFix?: string }> {
     const job = this.jobs.find((j) => j.id === id);
     if (!job) return { success: false, error: 'Job not found' };
@@ -1709,7 +1711,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const old = { ...job };
     job.is_paid = !job.is_paid;
     if (job.is_paid) {
-      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+      job.payment_date = customPaymentDate || job.payment_date || getTodayString(this.currentSession?.company?.timezone);
     } else {
       job.payment_date = undefined;
     }
@@ -1757,7 +1759,8 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
   public async setJobPaymentStatus(
     id: string,
     isPaid: boolean,
-    forceLocal = false
+    forceLocal = false,
+    customPaymentDate?: string
   ): Promise<{ success: boolean; job?: Job; error?: string; isConstraintError?: boolean; sqlFix?: string }> {
     const job = this.jobs.find((j) => j.id === id);
     if (!job) return { success: false, error: 'Job not found' };
@@ -1765,7 +1768,7 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
     const old = { ...job };
     job.is_paid = isPaid;
     if (job.is_paid) {
-      job.payment_date = job.payment_date || getTodayString(this.currentSession?.company?.timezone);
+      job.payment_date = customPaymentDate || job.payment_date || getTodayString(this.currentSession?.company?.timezone);
     } else {
       job.payment_date = undefined;
     }

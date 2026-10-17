@@ -9,6 +9,7 @@ import { exportToCSV, printElement } from '@/lib/export';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
 import { getTodayString, getYesterdayString, getLocalDateString, getFirstDayOfMonthString } from '@/lib/date-utils';
 import { ProfessionalInvoiceModal } from '@/components/common/ProfessionalInvoiceModal';
+import { PaymentDateModal } from '@/components/common/PaymentDateModal';
 import {
   History,
   Search,
@@ -68,6 +69,7 @@ export function SalesHistoryScreen() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [constraintModalJob, setConstraintModalJob] = useState<Job | null>(null);
+  const [paymentModalJob, setPaymentModalJob] = useState<Job | null>(null);
 
   const role = session?.profile.role || 'staff';
   const isPlatform = ['superadmin', 'superstaff'].includes(role);
@@ -251,24 +253,47 @@ export function SalesHistoryScreen() {
 
   // Quick 1-Click Toggle Paid / Unpaid Status
   const handleTogglePayment = async (job: Job) => {
-    const newStatus = !job.is_paid;
-    const tz = session?.company?.timezone;
-    const todayStr = getTodayString(tz);
-    // Optimistic local update for instant feedback
+    if (!job.is_paid) {
+      // Prompt user to select/confirm payment date (defaults to today)
+      setPaymentModalJob(job);
+      return;
+    }
+
+    // Reverting to UNPAID
+    const newStatus = false;
     setJobs((prev) =>
-      prev.map((j) => (j.id === job.id ? { ...j, is_paid: newStatus, payment_date: newStatus ? (j.payment_date || todayStr) : undefined } : j))
+      prev.map((j) => (j.id === job.id ? { ...j, is_paid: false, payment_date: undefined } : j))
     );
 
-    const res = await dataProvider.toggleJobPayment(job.id);
+    const res = await dataProvider.setJobPaymentStatus(job.id, false);
+    if (res.success) {
+      showToast(`↩ Vehicle ${job.plate || job.work_type} marked as UNPAID!`, 'info');
+      triggerRefresh();
+    } else {
+      // Revert if error
+      setJobs((prev) =>
+        prev.map((j) => (j.id === job.id ? { ...j, is_paid: true, payment_date: job.payment_date } : j))
+      );
+      showToast(res.error || 'Failed to update payment status', 'error');
+    }
+  };
+
+  const handleConfirmPayment = async (job: Job, paymentDate: string) => {
+    setPaymentModalJob(null);
+
+    // Optimistic local update for instant feedback
+    setJobs((prev) =>
+      prev.map((j) => (j.id === job.id ? { ...j, is_paid: true, payment_date: paymentDate } : j))
+    );
+
+    const res = await dataProvider.setJobPaymentStatus(job.id, true, false, paymentDate);
     if (res.success) {
       const cust = job.customer_id ? customerList.find((c) => c.id === job.customer_id) : null;
       showToast(
-        newStatus
-          ? cust
-            ? `✓ Vehicle ${job.plate || job.work_type} marked as PAID (${job.total.toFixed(2)} ${currency})! Customer ${cust.name}'s balance reduced.`
-            : `✓ Vehicle ${job.plate || job.work_type} marked as PAID (${job.total.toFixed(2)} ${currency})!`
-          : `↩ Vehicle ${job.plate || job.work_type} marked as UNPAID!`,
-        newStatus ? 'success' : 'info'
+        cust
+          ? `✓ Vehicle ${job.plate || job.work_type} marked as PAID on ${paymentDate} (${job.total.toFixed(2)} ${currency})! Customer ${cust.name}'s balance reduced.`
+          : `✓ Vehicle ${job.plate || job.work_type} marked as PAID on ${paymentDate} (${job.total.toFixed(2)} ${currency})!`,
+        'success'
       );
       if (res.isConstraintError) {
         setConstraintModalJob(job);
@@ -277,7 +302,7 @@ export function SalesHistoryScreen() {
     } else {
       // Revert if error
       setJobs((prev) =>
-        prev.map((j) => (j.id === job.id ? { ...j, is_paid: !newStatus } : j))
+        prev.map((j) => (j.id === job.id ? { ...j, is_paid: job.is_paid, payment_date: job.payment_date } : j))
       );
       if (res.isConstraintError) {
         setConstraintModalJob(job);
@@ -289,14 +314,17 @@ export function SalesHistoryScreen() {
 
   const handleRetryAfterSql = async () => {
     if (!constraintModalJob) return;
-    const res = await dataProvider.toggleJobPayment(constraintModalJob.id);
+    const tz = session?.company?.timezone;
+    const todayStr = getTodayString(tz);
+    const payDate = constraintModalJob.payment_date || todayStr;
+    const res = await dataProvider.setJobPaymentStatus(constraintModalJob.id, true, false, payDate);
     if (res.success) {
       setJobs((prev) =>
-        prev.map((j) => (j.id === constraintModalJob.id ? { ...j, is_paid: !constraintModalJob.is_paid } : j))
+        prev.map((j) => (j.id === constraintModalJob.id ? { ...j, is_paid: true, payment_date: payDate } : j))
       );
       const cust = constraintModalJob.customer_id ? customerList.find((c) => c.id === constraintModalJob.customer_id) : null;
       showToast(
-        `✓ Database constraint cleared! Vehicle marked as PAID (${constraintModalJob.total.toFixed(2)} ${currency})!${cust ? ` ${cust.name} balance reduced.` : ''}`,
+        `✓ Database constraint cleared! Vehicle marked as PAID on ${payDate} (${constraintModalJob.total.toFixed(2)} ${currency})!${cust ? ` ${cust.name} balance reduced.` : ''}`,
         'success'
       );
       setConstraintModalJob(null);
@@ -308,9 +336,12 @@ export function SalesHistoryScreen() {
 
   const handleMarkLocally = async () => {
     if (!constraintModalJob) return;
-    await dataProvider.toggleJobPayment(constraintModalJob.id, true);
+    const tz = session?.company?.timezone;
+    const todayStr = getTodayString(tz);
+    const payDate = constraintModalJob.payment_date || todayStr;
+    await dataProvider.setJobPaymentStatus(constraintModalJob.id, true, true, payDate);
     setJobs((prev) =>
-      prev.map((j) => (j.id === constraintModalJob.id ? { ...j, is_paid: !constraintModalJob.is_paid } : j))
+      prev.map((j) => (j.id === constraintModalJob.id ? { ...j, is_paid: true, payment_date: payDate } : j))
     );
     showToast(`✓ Marked as PAID in local session! Customer balance updated.`, 'success');
     setConstraintModalJob(null);
@@ -355,6 +386,9 @@ export function SalesHistoryScreen() {
     e.preventDefault();
     if (!editingJob) return;
 
+    const todayStr = getTodayString(session?.company?.timezone);
+    const resolvedPaymentDate = editingJob.is_paid ? (editingJob.payment_date || todayStr) : undefined;
+
     const res = dataProvider.updateJob(editingJob.id, {
       plate: editingJob.plate || undefined,
       mobile: editingJob.mobile || undefined,
@@ -366,6 +400,7 @@ export function SalesHistoryScreen() {
       customer_id: editingJob.customer_id,
       is_paid: editingJob.is_paid,
       entry_date: editingJob.entry_date,
+      payment_date: resolvedPaymentDate,
     });
 
     if (res.success) {
@@ -378,6 +413,7 @@ export function SalesHistoryScreen() {
             ? {
                 ...j,
                 ...editingJob,
+                payment_date: resolvedPaymentDate,
                 staff_name: updatedStaff?.full_name || j.staff_name,
                 customer_name: updatedCustomer?.name || (editingJob.customer_id ? j.customer_name : undefined),
               }
@@ -947,21 +983,30 @@ export function SalesHistoryScreen() {
                               const payDateDisplay = job.payment_date || job.entry_date;
                               if (isPaidLate) {
                                 return (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shadow-sm"
-                                    title={`Service Date: ${job.entry_date} → Paid on: ${job.payment_date}`}
+                                  <button
+                                    type="button"
+                                    onClick={() => setPaymentModalJob(job)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shadow-sm transition cursor-pointer"
+                                    title={`Service Date: ${job.entry_date} → Paid on: ${job.payment_date}. Click to change payment date.`}
                                   >
                                     <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
                                     PAID LATE ({job.payment_date})
-                                  </span>
+                                    <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
+                                  </button>
                                 );
                               }
                               if (job.is_paid) {
                                 return (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPaymentModalJob(job)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 transition cursor-pointer"
+                                    title="Click to change payment date"
+                                  >
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                     PAID ({payDateDisplay})
-                                  </span>
+                                    <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
+                                  </button>
                                 );
                               }
                               return (
@@ -972,28 +1017,40 @@ export function SalesHistoryScreen() {
                               );
                             })()}
 
-                            {/* Quick 1-Click Toggle Button */}
-                            <button
-                              onClick={() => handleTogglePayment(job)}
-                              className={`py-1 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-sm ${
-                                job.is_paid
-                                  ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700'
-                                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 font-extrabold'
-                              }`}
-                              title={job.is_paid ? 'Click to mark this transaction as UNPAID' : 'Click to mark this transaction as PAID'}
-                            >
-                              {job.is_paid ? (
-                                <>
-                                  <RotateCcw className="w-3 h-3" />
-                                  <span>Mark Unpaid</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Mark as Paid</span>
-                                </>
+                            {/* Payment Actions: Change Date & Toggle Paid/Unpaid */}
+                            <div className="inline-flex items-center gap-1">
+                              {job.is_paid && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentModalJob(job)}
+                                  className="p-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition shadow-sm"
+                                  title="Change Payment Date"
+                                >
+                                  <Calendar className="w-3.5 h-3.5" />
+                                </button>
                               )}
-                            </button>
+                              <button
+                                onClick={() => handleTogglePayment(job)}
+                                className={`py-1 px-2.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-sm ${
+                                  job.is_paid
+                                    ? 'bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/40 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 font-extrabold'
+                                }`}
+                                title={job.is_paid ? 'Click to mark this transaction as UNPAID' : 'Click to mark this transaction as PAID'}
+                              >
+                                {job.is_paid ? (
+                                  <>
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Mark Unpaid</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Mark as Paid</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </td>
 
@@ -1093,13 +1150,19 @@ export function SalesHistoryScreen() {
                           <Clock className="w-3 h-3" />
                           <span>Washed: {job.entry_date}</span>
                           {job.is_paid && (
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                              job.payment_date && job.payment_date !== job.entry_date
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300'
-                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            }`}>
-                              • Paid: {job.payment_date || job.entry_date}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setPaymentModalJob(job)}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition ${
+                                job.payment_date && job.payment_date !== job.entry_date
+                                  ? 'bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-950/60 dark:hover:bg-purple-900/80 dark:text-purple-300 border border-purple-300'
+                                  : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 dark:text-emerald-300'
+                              }`}
+                              title="Click to change payment date"
+                            >
+                              <span>• Paid: {job.payment_date || job.entry_date}</span>
+                              <Calendar className="w-2.5 h-2.5 opacity-70 ml-0.5" />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -1184,7 +1247,7 @@ export function SalesHistoryScreen() {
                     </div>
 
                     {/* 1-Click Touch Friendly Payment Button (44px height) */}
-                    <div className="pt-2">
+                    <div className="pt-2 space-y-1.5">
                       <button
                         onClick={() => handleTogglePayment(job)}
                         className={`w-full py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] ${
@@ -1196,7 +1259,7 @@ export function SalesHistoryScreen() {
                         {job.is_paid ? (
                           <>
                             <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Mark Unpaid (Currently: PAID ✓)</span>
+                            <span>Mark Unpaid</span>
                           </>
                         ) : (
                           <>
@@ -1205,6 +1268,16 @@ export function SalesHistoryScreen() {
                           </>
                         )}
                       </button>
+                      {job.is_paid && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentModalJob(job)}
+                          className="w-full py-2 px-3 rounded-xl text-[11px] font-bold bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center gap-1.5 transition active:scale-[0.98]"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Change Payment Date ({job.payment_date || job.entry_date})</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1363,16 +1436,74 @@ export function SalesHistoryScreen() {
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="text-slate-700 dark:text-slate-300 block mb-1 font-semibold">Payment Status</label>
                 <select
                   value={editingJob.is_paid ? 'paid' : 'unpaid'}
-                  onChange={(e) => setEditingJob({ ...editingJob, is_paid: e.target.value === 'paid' })}
+                  onChange={(e) => {
+                    const isPaid = e.target.value === 'paid';
+                    const tz = session?.company?.timezone;
+                    const todayStr = getTodayString(tz);
+                    setEditingJob({
+                      ...editingJob,
+                      is_paid: isPaid,
+                      payment_date: isPaid ? (editingJob.payment_date || todayStr) : undefined,
+                    });
+                  }}
                   className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white font-bold"
                 >
                   <option value="paid">{editingJob.customer_id ? '✓ PAID (Paid at Counter)' : '✓ PAID (Cash/Card)'}</option>
                   <option value="unpaid">{editingJob.customer_id ? '💳 UNPAID (Customer Credit)' : '✗ UNPAID'}</option>
                 </select>
+
+                {editingJob.is_paid && (
+                  <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Payment Date</span>
+                      </label>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tz = session?.company?.timezone;
+                            const todayStr = getTodayString(tz);
+                            setEditingJob({ ...editingJob, payment_date: todayStr });
+                          }}
+                          className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"
+                        >
+                          Today
+                        </button>
+                        {editingJob.entry_date && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingJob({ ...editingJob, payment_date: editingJob.entry_date })}
+                            className="text-[10px] px-2 py-0.5 rounded-lg font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50"
+                          >
+                            Wash Date ({editingJob.entry_date})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      type="date"
+                      value={editingJob.payment_date || getTodayString(session?.company?.timezone)}
+                      onChange={(e) => setEditingJob({ ...editingJob, payment_date: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {editingJob.payment_date && editingJob.payment_date !== editingJob.entry_date ? (
+                        <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                          Recorded as Late Payment on {editingJob.payment_date} (Washed on {editingJob.entry_date})
+                        </span>
+                      ) : (
+                        <span>Paid on wash date ({editingJob.entry_date})</span>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
@@ -1460,6 +1591,15 @@ export function SalesHistoryScreen() {
           </div>
         </div>
       )}
+      {/* Payment Date Picker Modal (Late/Custom/Default Today) */}
+      <PaymentDateModal
+        job={paymentModalJob}
+        isOpen={Boolean(paymentModalJob)}
+        onClose={() => setPaymentModalJob(null)}
+        onConfirm={handleConfirmPayment}
+        timezone={session?.company?.timezone}
+        currency={currency}
+      />
     </div>
   );
 }
