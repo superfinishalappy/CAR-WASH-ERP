@@ -26,6 +26,8 @@ import {
   Receipt,
   Printer,
   Camera,
+  Sparkles,
+  Banknote,
 } from 'lucide-react';
 import { Pagination } from '@/components/common/Pagination';
 import SqlConstraintFixModal from '@/components/common/SqlConstraintFixModal';
@@ -614,61 +616,82 @@ export function VehiclesScreen() {
       </div>
 
       {/* Summary KPI Badges - Total Revenue, Base Amount, and Extra Amount */}
-      {(isOwner || isManager) && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.count}</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{count}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.count}</div>
+          <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{count}</div>
+          <div className="text-[10px] text-slate-400">Total Entries</div>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Actual Revenue</div>
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+            {totalRev.toFixed(2)} <span className="text-xs font-semibold text-slate-400">{currency}</span>
           </div>
-          <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Actual Revenue</div>
-            <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
-              {totalRev.toFixed(2)} <span className="text-xs font-semibold text-slate-400">{currency}</span>
-            </div>
-            <div className="text-[10px] text-slate-400 dark:text-slate-500">Value of Work Done</div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-500">Value of Work Done</div>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Base Amount</div>
+          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+            {totalBase.toFixed(2)} <span className="text-xs font-semibold text-slate-400">{currency}</span>
           </div>
-          <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Today's Paid</div>
-            <div className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
-              {paidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-            </div>
-            <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Paid for Today's Jobs</div>
+          <div className="text-[10px] text-slate-400">Standard Service Price</div>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-purple-700 dark:text-purple-400 font-medium flex items-center justify-between">
+            <span>Extra Amount</span>
+            <Sparkles className="w-3.5 h-3.5 text-purple-500" />
           </div>
-          <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-purple-700 dark:text-purple-400 font-medium">Old Jobs Paid Today</div>
-            <div className="text-xl font-bold text-purple-800 dark:text-purple-300 mt-1">
-              {lateJobCashCollectedToday.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-            </div>
-            <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80">
-              {lateJobsCollectedToday.length} past vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'} collected
-            </div>
+          <div className="text-2xl font-black text-purple-900 dark:text-purple-200 mt-1">
+            {totalExtra.toFixed(2)} <span className="text-xs font-semibold text-purple-400">{currency}</span>
           </div>
-          <div className="col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
-            <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> Total Cash in Drawer</span>
-              {totalDrawerOut > 0 && (
-                <span className="text-[10px] font-medium bg-emerald-700/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Out: -{totalDrawerOut.toFixed(2)}
-                </span>
-              )}
-            </div>
-            <div className="text-3xl font-black mt-1">
-              {cashInDrawer.toFixed(2)} <span className="text-sm font-semibold text-emerald-200">{currency}</span>
-            </div>
-            {totalDrawerOut > 0 && (
-              <div className="text-[10px] text-emerald-100/90 font-medium mt-0.5">
-                In: +{totalDrawerIn.toFixed(2)} | Out (Exp/Adv/Salary): -{totalDrawerOut.toFixed(2)}
-              </div>
-            )}
+          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80">Polish & Add-ons</div>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Today's Paid</div>
+          <div className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-1">
+            {paidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
           </div>
-          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
-            <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
-            <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
-              {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-            </div>
+          <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Paid for Today's Jobs</div>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-purple-700 dark:text-purple-400 font-medium">Old Jobs Paid Today</div>
+          <div className="text-xl font-bold text-purple-800 dark:text-purple-300 mt-1">
+            {lateJobCashCollectedToday.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+          </div>
+          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80">
+            {lateJobsCollectedToday.length} past vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'}
           </div>
         </div>
-      )}
+        <div className="col-span-2 sm:col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
+          <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><Banknote className="w-4 h-4" /> Total Cash in Drawer</span>
+            {totalDrawerOut > 0 && (
+              <span className="text-[10px] font-medium bg-emerald-700/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                Out: -{totalDrawerOut.toFixed(2)}
+              </span>
+            )}
+          </div>
+          <div className="text-3xl font-black mt-1">
+            {cashInDrawer.toFixed(2)} <span className="text-sm font-semibold text-emerald-200">{currency}</span>
+          </div>
+          {totalDrawerOut > 0 ? (
+            <div className="text-[10px] text-emerald-100/90 font-medium mt-0.5">
+              In: +{totalDrawerIn.toFixed(2)} | Out (Exp/Adv): -{totalDrawerOut.toFixed(2)}
+            </div>
+          ) : (
+            <div className="text-[10px] text-emerald-100/90 font-medium mt-0.5">
+              Collected & deposited in register
+            </div>
+          )}
+        </div>
+        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
+          <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
+            {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+          </div>
+          <div className="text-[10px] text-rose-600/80 dark:text-rose-400/80">Pending customer balance</div>
+        </div>
+      </div>
 
       {/* Past Vehicles Collected on this Date */}
       {lateJobsCollectedToday.length > 0 && (
@@ -691,7 +714,9 @@ export function VehiclesScreen() {
                   <th className="py-2.5 px-3">Plate / Mobile</th>
                   <th className="py-2.5 px-3">Service</th>
                   <th className="py-2.5 px-3">Staff</th>
-                  <th className="py-2.5 px-3">Amount</th>
+                  <th className="py-2.5 px-3 text-right rtl:text-left">Base ({currency})</th>
+                  <th className="py-2.5 px-3 text-right rtl:text-left">Extra ({currency})</th>
+                  <th className="py-2.5 px-3 text-right rtl:text-left">Total ({currency})</th>
                   <th className="py-2.5 px-3">Payment Status</th>
                   <th className="py-2.5 px-3 text-right rtl:text-left rounded-r-xl">Action</th>
                 </tr>
@@ -717,8 +742,20 @@ export function VehiclesScreen() {
                     <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
                       {j.staff_name}
                     </td>
-                    <td className="py-2.5 px-3 font-black text-slate-900 dark:text-white">
-                      {j.total.toFixed(2)} {currency}
+                    <td className="py-2.5 px-3 text-right rtl:text-left font-mono font-semibold text-slate-700 dark:text-slate-300">
+                      {j.price.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right rtl:text-left">
+                      {j.extra_amount > 0 ? (
+                        <span className="font-semibold text-purple-700 dark:text-purple-300 font-mono text-[11px]">
+                          +{j.extra_amount.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-[11px]">0.00</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right rtl:text-left font-black text-slate-900 dark:text-white font-mono">
+                      {j.total.toFixed(2)}
                     </td>
                     <td className="py-2.5 px-3">
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 inline-flex items-center gap-1">
@@ -1159,7 +1196,9 @@ export function VehiclesScreen() {
                     <th className="py-3 px-4">Plate / Mobile</th>
                     <th className="py-3 px-4">Service</th>
                     <th className="py-3 px-4">Staff</th>
-                    <th className="py-3 px-4">Value (Price + Extra)</th>
+                    <th className="py-3 px-4 text-right rtl:text-left">Base Amount ({currency})</th>
+                    <th className="py-3 px-4 text-right rtl:text-left">Extra Amount ({currency})</th>
+                    <th className="py-3 px-4 text-right rtl:text-left">Total ({currency})</th>
                     <th className="py-3 px-4">Payment</th>
                     <th className="py-3 px-4 text-right rtl:text-left">{t.common.actions}</th>
                   </tr>
@@ -1211,15 +1250,20 @@ export function VehiclesScreen() {
                         <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">
                           {job.staff_name}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            {job.total.toFixed(2)}
-                          </div>
-                          {job.extra_amount > 0 && (
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                              ({job.price} + {job.extra_amount} extra)
-                            </div>
+                        <td className="py-3 px-4 text-right rtl:text-left font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                          {job.price.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right rtl:text-left">
+                          {job.extra_amount > 0 ? (
+                            <span className="font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/40 font-mono">
+                              +{job.extra_amount.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-mono">0.00</span>
                           )}
+                        </td>
+                        <td className="py-3 px-4 text-right rtl:text-left font-black text-slate-900 dark:text-slate-100 text-sm font-mono">
+                          {job.total.toFixed(2)}
                         </td>
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -1450,17 +1494,26 @@ export function VehiclesScreen() {
                         </div>
                       )}
 
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">Base Amount:</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                          {job.price.toFixed(2)} {currency}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">Extra Amount:</span>
+                        <span className="font-semibold text-purple-600 dark:text-purple-400 font-mono">
+                          {job.extra_amount > 0 ? `+${job.extra_amount.toFixed(2)}` : '0.00'} {currency}
+                        </span>
+                      </div>
+
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
                         <div>
                           <span className="text-slate-500 dark:text-slate-400 text-[11px] block font-medium">Total Amount</span>
-                          {job.extra_amount > 0 && (
-                            <span className="text-[10px] text-slate-400">
-                              ({job.price.toFixed(2)} + {job.extra_amount.toFixed(2)} extra)
-                            </span>
-                          )}
                         </div>
                         <div className="text-right">
-                          <span className="text-lg font-black text-slate-900 dark:text-white">
+                          <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
                             {job.total.toFixed(2)}{' '}
                             <span className="text-xs font-semibold text-slate-400">{currency}</span>
                           </span>

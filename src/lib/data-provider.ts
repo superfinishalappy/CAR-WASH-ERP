@@ -655,7 +655,7 @@ export class DataProvider {
   public canEdit(entryDate: string): boolean {
     if (!this.currentSession) return false;
     const role = this.currentSession.profile.role;
-    if (['superadmin', 'superstaff', 'owner'].includes(role)) return true;
+    if (['superadmin', 'superstaff', 'owner', 'manager'].includes(role)) return true;
     return this.isSameDay(entryDate);
   }
 
