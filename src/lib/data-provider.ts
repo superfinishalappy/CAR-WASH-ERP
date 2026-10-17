@@ -2775,50 +2775,10 @@ public getDailyCashAdjustments(date: string, companyId?: string): DailyCashAdjus
       }
     }
 
-    // 1. Operating and logged expenses (including any staff salary payouts) for that day
+    // Operating and logged expenses for each day (reflects actual expenses logged)
     for (const e of pExpenses) {
-        if (dailyMap[e.entry_date]) {
-          dailyMap[e.entry_date].expenses += e.amount;
-        }
-      }
-
-      for (const a of pAdvances) {
-        if (dailyMap[a.entry_date]) {
-          const isRepayment = (a.note || '').includes('[REPAYMENT]');
-          dailyMap[a.entry_date].expenses += isRepayment ? -a.amount : a.amount;
-        }
-      }
-
-    // 2. For dates where no explicit Staff Salary payout was recorded in expenses, add daily earned commission & wages
-    const staffSalaryPaidDates = new Set(
-      pExpenses.filter((e) => e.category === 'Staff Salary').map((e) => e.entry_date)
-    );
-
-    for (const j of pJobs) {
-      if (!staffSalaryPaidDates.has(j.entry_date) && dailyMap[j.entry_date]) {
-        const staff = companyStaff.find((s) => s.id === j.staff_id);
-        if (staff && staff.pay_type === 'commission') {
-          const commAmt = j.commission_amount !== undefined
-            ? j.commission_amount
-            : (j.price * (j.commission_rate ?? (Number(staff.pay_rate) || 0))) / 100;
-          dailyMap[j.entry_date].expenses += commAmt;
-        }
-      }
-    }
-
-    for (const staff of companyStaff) {
-      if (staff.pay_type === 'daily') {
-        const atts = this.attendance.filter(
-          (a) => a.staff_id === staff.id && a.entry_date >= startDate && a.entry_date <= endDate && a.status === 'present'
-        );
-        for (const att of atts) {
-          if (!staffSalaryPaidDates.has(att.entry_date) && dailyMap[att.entry_date]) {
-            const wage = att.daily_rate !== undefined
-              ? att.daily_rate
-              : (Number(staff.pay_rate) || 0);
-            dailyMap[att.entry_date].expenses += wage;
-          }
-        }
+      if (dailyMap[e.entry_date]) {
+        dailyMap[e.entry_date].expenses += e.amount;
       }
     }
 

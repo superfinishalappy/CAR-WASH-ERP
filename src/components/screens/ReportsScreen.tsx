@@ -785,7 +785,7 @@ export function ReportsScreen() {
         <div className="lg:col-span-2 p-6 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-md dark:shadow-xl space-y-4 transition-colors">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 border-b border-slate-100 dark:border-slate-800">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.reports.charts.dailyTitle}</h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Total Revenue vs. Daily Costs (OPEX + Staff Payroll)</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Total Revenue vs. Daily Expenses</span>
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -802,7 +802,7 @@ export function ReportsScreen() {
                 />
                 <Legend />
                 <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Expenses (OPEX + Salary)" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" name="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -615,8 +615,8 @@ export function VehiclesScreen() {
         </div>
       </div>
 
-      {/* Summary KPI Badges - Total Revenue, Base Amount, and Extra Amount */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+      {/* Row 1 KPI Badges - Vehicle, Actual Revenue, Base Amount, Extra Amount, Paid, and Unpaid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
           <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.vehicles.count}</div>
           <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{count}</div>
@@ -653,16 +653,35 @@ export function VehiclesScreen() {
           </div>
           <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Paid for Today's Jobs</div>
         </div>
-        <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-purple-700 dark:text-purple-400 font-medium">Old Jobs Paid Today</div>
-          <div className="text-xl font-bold text-purple-800 dark:text-purple-300 mt-1">
-            {lateJobCashCollectedToday.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
+        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
+          <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
+          <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
+            {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
           </div>
-          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80">
-            {lateJobsCollectedToday.length} past vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'}
+          <div className="text-[10px] text-rose-600/80 dark:text-rose-400/80">Pending customer balance</div>
+        </div>
+      </div>
+
+      {/* Row 2 KPI Badges - Old Jobs Paid Today and Total Cash in Drawer */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-purple-50/80 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md flex flex-col justify-center">
+          <div className="text-xs text-purple-700 dark:text-purple-400 font-bold uppercase tracking-wider flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> Old Jobs Paid Today
+            </span>
+            <span className="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800/60 font-medium">
+              {lateJobsCollectedToday.length} past vehicle{lateJobsCollectedToday.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-purple-900 dark:text-purple-200 mt-1">
+            {lateJobCashCollectedToday.toFixed(2)} <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">{currency}</span>
+          </div>
+          <div className="text-[10px] text-purple-600/80 dark:text-purple-400/80 font-medium mt-0.5">
+            Past vehicles washed earlier but collected today
           </div>
         </div>
-        <div className="col-span-2 sm:col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
+
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-700 shadow-md text-white flex flex-col justify-center">
           <div className="text-xs font-bold uppercase tracking-wider text-emerald-100 flex items-center justify-between">
             <span className="flex items-center gap-1.5"><Banknote className="w-4 h-4" /> Total Cash in Drawer</span>
             {totalDrawerOut > 0 && (
@@ -671,7 +690,7 @@ export function VehiclesScreen() {
               </span>
             )}
           </div>
-          <div className="text-3xl font-black mt-1">
+          <div className="text-2xl sm:text-3xl font-black mt-1">
             {cashInDrawer.toFixed(2)} <span className="text-sm font-semibold text-emerald-200">{currency}</span>
           </div>
           {totalDrawerOut > 0 ? (
@@ -683,13 +702,6 @@ export function VehiclesScreen() {
               Collected & deposited in register
             </div>
           )}
-        </div>
-        <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 shadow-sm backdrop-blur-md">
-          <div className="text-xs text-rose-700 dark:text-rose-400 font-medium">{t.vehicles.unpaid} / Credit</div>
-          <div className="text-xl font-bold text-rose-800 dark:text-rose-300 mt-1">
-            {unpaidRev.toFixed(2)} <span className="text-xs font-normal">{currency}</span>
-          </div>
-          <div className="text-[10px] text-rose-600/80 dark:text-rose-400/80">Pending customer balance</div>
         </div>
       </div>
 

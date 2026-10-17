@@ -436,32 +436,9 @@ export function SalesHistoryScreen() {
         </div>
       </div>
 
-      {/* Top Summary KPI Cards - Total Cash, Total Sales, Base Amount, Extra Amount, Unpaid / Due */}
+      {/* Top Summary KPI Cards - Total Sales, Base Amount, Extra Amount, Paid, Unpaid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* 1. Total Cash (Paid / Collected) */}
-        <div
-          onClick={() => setStatusFilter(statusFilter === 'paid' ? 'all' : 'paid')}
-          className={`p-4 sm:p-5 rounded-3xl bg-emerald-50/80 dark:bg-emerald-950/20 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
-            statusFilter === 'paid'
-              ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-              : 'border-emerald-200 dark:border-emerald-800/40'
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
-            <span className="font-bold uppercase tracking-wider text-[11px]">Total Cash</span>
-            <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 mt-2 truncate">
-            {metrics.paidRevenue.toFixed(2)}{' '}
-            <span className="text-xs font-bold text-emerald-600/70">{currency}</span>
-          </div>
-          <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-semibold flex items-center justify-between">
-            <span>{metrics.paidCount} paid orders</span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Filter Cash →</span>
-          </div>
-        </div>
-
-        {/* 2. Total Sales / Revenue */}
+        {/* 1. Total Sales / Revenue */}
         <div
           onClick={() => setStatusFilter('all')}
           className={`p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/90 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
@@ -484,7 +461,7 @@ export function SalesHistoryScreen() {
           </div>
         </div>
 
-        {/* 3. Base Amount */}
+        {/* 2. Base Amount */}
         <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
             <span className="font-bold uppercase tracking-wider text-[11px] text-indigo-600 dark:text-indigo-400">Base Amount</span>
@@ -499,7 +476,7 @@ export function SalesHistoryScreen() {
           </div>
         </div>
 
-        {/* 4. Extra Amount */}
+        {/* 3. Extra Amount */}
         <div className="p-4 sm:p-5 rounded-3xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between text-xs text-purple-700 dark:text-purple-400 font-medium">
             <span className="font-bold uppercase tracking-wider text-[11px]">Extra Amount</span>
@@ -511,6 +488,29 @@ export function SalesHistoryScreen() {
           </div>
           <div className="text-xs text-purple-700/80 dark:text-purple-400/80 mt-1 font-medium">
             Polish, Parts & Add-ons
+          </div>
+        </div>
+
+        {/* 4. Total Cash (Paid / Collected) */}
+        <div
+          onClick={() => setStatusFilter(statusFilter === 'paid' ? 'all' : 'paid')}
+          className={`p-4 sm:p-5 rounded-3xl bg-emerald-50/80 dark:bg-emerald-950/20 border transition cursor-pointer shadow-sm hover:shadow-md backdrop-blur-md ${
+            statusFilter === 'paid'
+              ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+              : 'border-emerald-200 dark:border-emerald-800/40'
+          }`}
+        >
+          <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+            <span className="font-bold uppercase tracking-wider text-[11px]">Paid (Total Cash)</span>
+            <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="text-2xl font-black text-emerald-800 dark:text-emerald-300 mt-2 truncate">
+            {metrics.paidRevenue.toFixed(2)}{' '}
+            <span className="text-xs font-bold text-emerald-600/70">{currency}</span>
+          </div>
+          <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-semibold flex items-center justify-between">
+            <span>{metrics.paidCount} paid orders</span>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Filter Cash →</span>
           </div>
         </div>
 
